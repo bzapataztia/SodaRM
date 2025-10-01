@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTenantSchema, insertContactSchema, insertPropertySchema, insertContractSchema, insertPaymentSchema, insertInsurerSchema, insertPolicySchema } from "@shared/schema";
+import { insertTenantSchema, insertContactSchema, insertPropertySchema, insertContractSchema, insertInvoiceSchema, insertPaymentSchema, insertInsurerSchema, insertPolicySchema } from "@shared/schema";
 import { createMonthlyInvoices, recalcInvoiceTotals } from "./services/invoiceEngine";
 import { sendReminderD3, sendReminderD1 } from "./services/emailService";
 import { createCheckoutSession, handleWebhook, createCustomerPortalSession } from "./services/stripeService";
@@ -145,6 +145,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/contacts/:id", isAuthenticated, withUser, async (req: any, res) => {
+    try {
+      const contact = await storage.getContact(req.params.id, req.tenantId);
+      if (!contact) {
+        return res.status(404).json({ message: "Contact not found" });
+      }
+      res.json(contact);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/contacts/:id", isAuthenticated, withUser, async (req: any, res) => {
+    try {
+      const contact = await storage.updateContact(req.params.id, req.tenantId, req.body);
+      if (!contact) {
+        return res.status(404).json({ message: "Contact not found" });
+      }
+      res.json(contact);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/contacts/:id", isAuthenticated, withUser, async (req: any, res) => {
+    try {
+      await storage.deleteContact(req.params.id, req.tenantId);
+      res.json({ message: "Contact deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Properties
   app.get("/api/properties", isAuthenticated, withUser, async (req: any, res) => {
     try {
@@ -175,6 +208,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/properties/:id", isAuthenticated, withUser, async (req: any, res) => {
+    try {
+      const property = await storage.getProperty(req.params.id, req.tenantId);
+      if (!property) {
+        return res.status(404).json({ message: "Property not found" });
+      }
+      res.json(property);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/properties/:id", isAuthenticated, withUser, async (req: any, res) => {
+    try {
+      const property = await storage.updateProperty(req.params.id, req.tenantId, req.body);
+      if (!property) {
+        return res.status(404).json({ message: "Property not found" });
+      }
+      res.json(property);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/properties/:id", isAuthenticated, withUser, async (req: any, res) => {
+    try {
+      await storage.deleteProperty(req.params.id, req.tenantId);
+      res.json({ message: "Property deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Contracts
   app.get("/api/contracts", isAuthenticated, withUser, async (req: any, res) => {
     try {
@@ -198,17 +264,50 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/contracts/:id", isAuthenticated, withUser, async (req: any, res) => {
+    try {
+      const contract = await storage.getContract(req.params.id, req.tenantId);
+      if (!contract) {
+        return res.status(404).json({ message: "Contract not found" });
+      }
+      res.json(contract);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/contracts/:id", isAuthenticated, withUser, async (req: any, res) => {
+    try {
+      const contract = await storage.updateContract(req.params.id, req.tenantId, req.body);
+      if (!contract) {
+        return res.status(404).json({ message: "Contract not found" });
+      }
+      res.json(contract);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/contracts/:id", isAuthenticated, withUser, async (req: any, res) => {
+    try {
+      await storage.deleteContract(req.params.id, req.tenantId);
+      res.json({ message: "Contract deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.post("/api/contracts/:id/activate", isAuthenticated, withUser, async (req: any, res) => {
     try {
       const { id } = req.params;
-      const contract = await storage.getContract(id);
+      const contract = await storage.getContract(id, req.tenantId);
       
-      if (!contract || contract.tenantId !== req.tenantId) {
+      if (!contract) {
         return res.status(404).json({ message: "Contract not found" });
       }
 
       const invoices = await createMonthlyInvoices(id);
-      await storage.updateContractStatus(id, "active");
+      await storage.updateContractStatus(id, req.tenantId, "active");
       
       res.json({ message: "Contract activated", invoicesCreated: invoices.length, invoices });
     } catch (error: any) {
@@ -228,9 +327,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.get("/api/invoices/:id", isAuthenticated, withUser, async (req: any, res) => {
     try {
-      const invoice = await storage.getInvoice(req.params.id);
+      const invoice = await storage.getInvoice(req.params.id, req.tenantId);
       
-      if (!invoice || invoice.tenantId !== req.tenantId) {
+      if (!invoice) {
         return res.status(404).json({ message: "Invoice not found" });
       }
       
@@ -242,9 +341,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/invoices/:id/remind", isAuthenticated, withUser, async (req: any, res) => {
     try {
-      const invoice = await storage.getInvoice(req.params.id);
+      const invoice = await storage.getInvoice(req.params.id, req.tenantId);
       
-      if (!invoice || invoice.tenantId !== req.tenantId) {
+      if (!invoice) {
         return res.status(404).json({ message: "Invoice not found" });
       }
 
@@ -264,14 +363,48 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/invoices/:id/recalc", isAuthenticated, withUser, async (req: any, res) => {
     try {
-      const invoice = await storage.getInvoice(req.params.id);
+      const invoice = await storage.getInvoice(req.params.id, req.tenantId);
       
-      if (!invoice || invoice.tenantId !== req.tenantId) {
+      if (!invoice) {
         return res.status(404).json({ message: "Invoice not found" });
       }
 
       const totals = await recalcInvoiceTotals(req.params.id);
       res.json({ message: "Invoice recalculated", totals });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/invoices", isAuthenticated, withUser, async (req: any, res) => {
+    try {
+      const invoiceData = insertInvoiceSchema.parse({
+        ...req.body,
+        tenantId: req.tenantId,
+      });
+      const invoice = await storage.createInvoice(invoiceData);
+      res.json(invoice);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/invoices/:id", isAuthenticated, withUser, async (req: any, res) => {
+    try {
+      const invoice = await storage.updateInvoice(req.params.id, req.tenantId, req.body);
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+      res.json(invoice);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/invoices/:id", isAuthenticated, withUser, async (req: any, res) => {
+    try {
+      await storage.deleteInvoice(req.params.id, req.tenantId);
+      res.json({ message: "Invoice deleted successfully" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -300,6 +433,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/payments/:id", isAuthenticated, withUser, async (req: any, res) => {
+    try {
+      const payment = await storage.getPayment(req.params.id, req.tenantId);
+      if (!payment) {
+        return res.status(404).json({ message: "Payment not found" });
+      }
+      res.json(payment);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/payments/:id", isAuthenticated, withUser, async (req: any, res) => {
+    try {
+      const payment = await storage.updatePayment(req.params.id, req.tenantId, req.body);
+      if (!payment) {
+        return res.status(404).json({ message: "Payment not found" });
+      }
+      res.json(payment);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/payments/:id", isAuthenticated, withUser, async (req: any, res) => {
+    try {
+      await storage.deletePayment(req.params.id, req.tenantId);
+      res.json({ message: "Payment deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Insurers
   app.get("/api/insurers", isAuthenticated, withUser, async (req: any, res) => {
     try {
@@ -323,6 +489,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.get("/api/insurers/:id", isAuthenticated, withUser, async (req: any, res) => {
+    try {
+      const insurer = await storage.getInsurer(req.params.id, req.tenantId);
+      if (!insurer) {
+        return res.status(404).json({ message: "Insurer not found" });
+      }
+      res.json(insurer);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/insurers/:id", isAuthenticated, withUser, async (req: any, res) => {
+    try {
+      const insurer = await storage.updateInsurer(req.params.id, req.tenantId, req.body);
+      if (!insurer) {
+        return res.status(404).json({ message: "Insurer not found" });
+      }
+      res.json(insurer);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/insurers/:id", isAuthenticated, withUser, async (req: any, res) => {
+    try {
+      await storage.deleteInsurer(req.params.id, req.tenantId);
+      res.json({ message: "Insurer deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // Policies
   app.get("/api/policies", isAuthenticated, withUser, async (req: any, res) => {
     try {
@@ -343,6 +542,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
       res.json(policy);
     } catch (error: any) {
       res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/policies/:id", isAuthenticated, withUser, async (req: any, res) => {
+    try {
+      const policy = await storage.getPolicy(req.params.id, req.tenantId);
+      if (!policy) {
+        return res.status(404).json({ message: "Policy not found" });
+      }
+      res.json(policy);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/policies/:id", isAuthenticated, withUser, async (req: any, res) => {
+    try {
+      const policy = await storage.updatePolicy(req.params.id, req.tenantId, req.body);
+      if (!policy) {
+        return res.status(404).json({ message: "Policy not found" });
+      }
+      res.json(policy);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
+  app.delete("/api/policies/:id", isAuthenticated, withUser, async (req: any, res) => {
+    try {
+      await storage.deletePolicy(req.params.id, req.tenantId);
+      res.json({ message: "Policy deleted successfully" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
     }
   });
 
