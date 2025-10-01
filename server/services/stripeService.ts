@@ -1,12 +1,10 @@
 import Stripe from 'stripe';
 
-if (!process.env.STRIPE_SECRET_KEY) {
-  throw new Error('STRIPE_SECRET_KEY must be set');
-}
-
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY, {
-  apiVersion: '2024-12-18.acacia',
-});
+const stripe = process.env.STRIPE_SECRET_KEY 
+  ? new Stripe(process.env.STRIPE_SECRET_KEY, {
+      apiVersion: '2024-12-18.acacia',
+    })
+  : null;
 
 const PLAN_PRICES = {
   starter: { priceId: process.env.STRIPE_PRICE_STARTER, maxProperties: 10 },
@@ -19,6 +17,10 @@ export async function createCheckoutSession(
   plan: 'starter' | 'growth' | 'pro',
   customerEmail: string
 ) {
+  if (!stripe) {
+    throw new Error('Stripe is not configured. Please set STRIPE_SECRET_KEY environment variable.');
+  }
+
   const planConfig = PLAN_PRICES[plan];
   
   if (!planConfig.priceId) {
@@ -93,6 +95,10 @@ export async function handleWebhook(event: Stripe.Event, db: any) {
 }
 
 export async function createCustomerPortalSession(customerId: string) {
+  if (!stripe) {
+    throw new Error('Stripe is not configured. Please set STRIPE_SECRET_KEY environment variable.');
+  }
+
   const session = await stripe.billingPortal.sessions.create({
     customer: customerId,
     return_url: `${process.env.APP_URL || 'http://localhost:5000'}/settings`,
