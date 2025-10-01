@@ -1,10 +1,14 @@
-import { useAuth } from '@/lib/auth';
+import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 
 export default function Topbar() {
-  const { user, logout } = useAuth();
+  const { user } = useAuth();
 
-  const userInitials = user?.fullName
+  const userName = user?.firstName && user?.lastName 
+    ? `${user.firstName} ${user.lastName}`
+    : user?.email || 'Usuario';
+
+  const userInitials = userName
     .split(' ')
     .map((n) => n[0])
     .join('')
@@ -29,7 +33,7 @@ export default function Topbar() {
 
         <div className="flex items-center gap-3 pl-4 border-l border-border">
           <div className="text-right">
-            <p className="text-sm font-medium text-foreground">{user?.fullName}</p>
+            <p className="text-sm font-medium text-foreground">{userName}</p>
             <p className="text-xs text-muted-foreground">{user?.role}</p>
           </div>
           <div className="relative group">
@@ -43,7 +47,7 @@ export default function Topbar() {
               <Button
                 variant="ghost"
                 className="w-full justify-start"
-                onClick={logout}
+                onClick={() => window.location.href = '/api/logout'}
                 data-testid="button-logout"
               >
                 <i className="fas fa-sign-out-alt mr-2"></i>

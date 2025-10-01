@@ -16,6 +16,8 @@ interface AuthTenant {
   plan: string;
   maxProperties: number;
   propertiesCount: number;
+  stripeCustomerId: string | null;
+  stripeSubscriptionId: string | null;
 }
 
 interface AuthResponse {
