@@ -7,6 +7,7 @@ import { sendReminderD3, sendReminderD1 } from "./services/emailService";
 import { createCheckoutSession, handleWebhook, createCustomerPortalSession } from "./services/stripeService";
 import { processOCR, approveOCRAndCreateCharge } from "./services/ocrService";
 import { generateInsurerMonthlyReport } from "./services/pdfService";
+import { importContactsCSV, importPropertiesCSV, importPaymentsCSV, generateContactsTemplate, generatePropertiesTemplate, generatePaymentsTemplate } from "./services/csvService";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import Stripe from "stripe";
 
@@ -147,6 +148,64 @@ export async function registerRoutes(app: Express): Promise<Server> {
     } catch (error: any) {
       res.status(400).json({ message: error.message });
     }
+  });
+
+  // CSV Import & Templates
+  app.post("/api/import/contacts", isAuthenticated, withUser, async (req: any, res) => {
+    try {
+      const { csvContent } = req.body;
+      if (!csvContent) {
+        return res.status(400).json({ message: "CSV content is required" });
+      }
+      const result = await importContactsCSV(csvContent, req.tenantId);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/import/properties", isAuthenticated, withUser, async (req: any, res) => {
+    try {
+      const { csvContent } = req.body;
+      if (!csvContent) {
+        return res.status(400).json({ message: "CSV content is required" });
+      }
+      const result = await importPropertiesCSV(csvContent, req.tenantId);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/import/payments", isAuthenticated, withUser, async (req: any, res) => {
+    try {
+      const { csvContent } = req.body;
+      if (!csvContent) {
+        return res.status(400).json({ message: "CSV content is required" });
+      }
+      const result = await importPaymentsCSV(csvContent, req.tenantId);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/templates/contacts.csv", (req, res) => {
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="plantilla_contactos.csv"');
+    res.send(generateContactsTemplate());
+  });
+
+  app.get("/api/templates/properties.csv", (req, res) => {
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="plantilla_propiedades.csv"');
+    res.send(generatePropertiesTemplate());
+  });
+
+  app.get("/api/templates/payments.csv", (req, res) => {
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="plantilla_pagos.csv"');
+    res.send(generatePaymentsTemplate());
   });
 
   // Contacts
