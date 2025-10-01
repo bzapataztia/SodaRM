@@ -14,11 +14,12 @@ Preferred communication style: Simple, everyday language.
 
 ### OCR Implementation with Tesseract.js (October 1, 2025)
 - **OCR Service:** Implemented OCR processing using Tesseract.js for utility bill data extraction. Single shared worker instance reused across requests for optimal performance.
-- **Image-Only Support:** Current implementation accepts image files only (JPG, PNG, GIF). PDF support planned for future using PDF-to-image conversion.
+- **File Format Support:** Accepts both image files (JPG, PNG, GIF) and PDF documents. Multi-page PDFs are processed sequentially with memory optimization.
+- **PDF Processing:** Uses pdfjs-dist with custom NodeCanvasFactory to convert PDF pages to images at 2.0 scale before OCR. Each page is processed individually to minimize memory usage.
 - **MIME Type Validation:** Backend validates file types and rejects unsupported formats with clear error messages surfaced to users.
 - **Invoice Integration:** Added "Subir Factura" button in Invoices page that opens OCR modal for uploading utility bills.
 - **Data Parsing:** Extracts provider name, total amount, period, consumption, and account numbers from Mexican utility providers (CFE, CCAPAMA, Naturgy).
-- **User Workflow:** Upload image → OCR processing → Display extracted data with confidence score → Preview raw text → Future: Approve and create charges.
+- **User Workflow:** Upload image/PDF → OCR processing → Display extracted data with confidence score → Preview raw text → Future: Approve and create charges.
 - **Error Handling:** Frontend displays backend error messages in toast notifications for better user feedback.
 
 ### Payment Validation (October 1, 2025)
@@ -119,7 +120,8 @@ All tenant-scoped tables include a `tenantId` foreign key. Row-level isolation i
 - **Twilio WhatsApp (planned):** WhatsApp bot integration for payment status queries (not yet implemented in codebase).
 
 **Document Processing:**
-- **Tesseract.js:** OCR processing for utility bills and service invoices using open-source Tesseract engine. Extracts text from image files (JPG, PNG, GIF) with Spanish language support. Single shared worker instance reused across requests for performance. PDF-to-image conversion planned for future expansion.
+- **Tesseract.js:** OCR processing for utility bills and service invoices using open-source Tesseract engine. Extracts text from both image files (JPG, PNG, GIF) and PDF documents with Spanish language support. Single shared worker instance reused across requests for performance.
+- **PDF.js (pdfjs-dist):** Mozilla's PDF rendering library used to convert PDF pages to images before OCR processing. Custom NodeCanvasFactory implementation enables PDF rendering in Node.js environment without DOM dependencies.
 
 **Cloud Storage:**
 - **S3-compatible storage:** For storing generated PDF reports and uploaded documents (referenced but not fully implemented in current codebase).
