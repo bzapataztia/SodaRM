@@ -82,7 +82,11 @@ export default function InvoiceDetailPage() {
                   <p className="text-muted-foreground">Factura de arrendamiento</p>
                 </div>
                 <div className="flex gap-2">
-                  <Button variant="outline" data-testid="button-download">
+                  <Button 
+                    variant="outline" 
+                    onClick={() => window.open(`/api/invoices/${invoiceId}/pdf`, '_blank')}
+                    data-testid="button-download"
+                  >
                     <i className="fas fa-download mr-2"></i>
                     Descargar PDF
                   </Button>

@@ -1,7 +1,9 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTenantSchema, updateTenantLogoSchema, insertContactSchema, insertPropertySchema, insertContractSchema, insertInvoiceSchema, insertPaymentSchema, insertInsurerSchema, insertPolicySchema } from "@shared/schema";
+import { db } from "./db";
+import { and, eq } from "drizzle-orm";
+import { invoices, insertTenantSchema, updateTenantLogoSchema, insertContactSchema, insertPropertySchema, insertContractSchema, insertInvoiceSchema, insertPaymentSchema, insertInsurerSchema, insertPolicySchema } from "@shared/schema";
 import { createMonthlyInvoices, recalcInvoiceTotals } from "./services/invoiceEngine";
 import { sendReminderD3, sendReminderD1 } from "./services/emailService";
 import { createCheckoutSession, handleWebhook, createCustomerPortalSession } from "./services/stripeService";
@@ -433,12 +435,21 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(404).json({ message: "Invoice not found" });
       }
 
-      // This endpoint requires the invoice to have related contact data loaded
-      // For now, return success - the email service handles getting the contact
+      // Get tenant contact to send email
+      const contact = await storage.getContact(invoice.tenantContactId, req.tenantId);
+      
+      if (!contact) {
+        return res.status(404).json({ message: "Tenant contact not found" });
+      }
+
+      if (!contact.email) {
+        return res.status(400).json({ message: "Tenant contact has no email address" });
+      }
+
       if (invoice.status === 'overdue') {
-        await sendReminderD1(invoice as any, null as any);
+        await sendReminderD1(invoice as any, contact as any);
       } else {
-        await sendReminderD3(invoice as any, null as any);
+        await sendReminderD3(invoice as any, contact as any);
       }
       
       res.json({ message: "Reminder sent successfully" });
@@ -457,6 +468,37 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
       const totals = await recalcInvoiceTotals(req.params.id);
       res.json({ message: "Invoice recalculated", totals });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.get("/api/invoices/:id/pdf", isAuthenticated, withUser, async (req: any, res) => {
+    try {
+      // Get invoice with all required relations for PDF generation
+      const invoice = await db.query.invoices.findFirst({
+        where: and(eq(invoices.id, req.params.id), eq(invoices.tenantId, req.tenantId)),
+        with: {
+          tenantContact: true,
+          contract: {
+            with: {
+              property: true,
+            },
+          },
+          charges: true,
+        },
+      });
+      
+      if (!invoice) {
+        return res.status(404).json({ message: "Invoice not found" });
+      }
+
+      const { generateInvoicePDF } = await import('./services/pdfService');
+      const pdfBuffer = await generateInvoicePDF(invoice);
+      
+      res.setHeader('Content-Type', 'application/pdf');
+      res.setHeader('Content-Disposition', `attachment; filename="${invoice.number}.pdf"`);
+      res.send(pdfBuffer);
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
@@ -809,7 +851,15 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const overdue = invoices.filter(inv => inv.status === 'overdue')
         .reduce((sum, inv) => sum + (parseFloat(inv.totalAmount) - parseFloat(inv.amountPaid)), 0);
       
-      const recovery = issued > 0 ? (collected / issued) * 100 : 0;
+      // Calculate recovery based on all invoices (issued and partial)
+      const totalIssued = invoices
+        .filter(inv => inv.status !== 'draft')
+        .reduce((sum, inv) => sum + parseFloat(inv.totalAmount), 0);
+      const totalCollected = invoices
+        .filter(inv => inv.status !== 'draft')
+        .reduce((sum, inv) => sum + parseFloat(inv.amountPaid), 0);
+      
+      const recovery = totalIssued > 0 ? (totalCollected / totalIssued) * 100 : 0;
 
       res.json({
         issued,

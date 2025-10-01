@@ -1,6 +1,7 @@
 import { db } from "../db";
 import { eq, and, gte, lte } from "drizzle-orm";
 import { invoices, contracts, properties, contacts } from "@shared/schema";
+import PDFDocument from 'pdfkit';
 
 export async function generateInsurerMonthlyReport(
   insurerId: string,
@@ -125,4 +126,103 @@ async function htmlToPdf(html: string): Promise<Buffer> {
   // This is a placeholder - in production use puppeteer or similar
   // For now, return the HTML as a buffer (you'd implement actual PDF conversion)
   return Buffer.from(html, 'utf-8');
+}
+
+export async function generateInvoicePDF(invoice: any): Promise<Buffer> {
+  return new Promise((resolve, reject) => {
+    const doc = new PDFDocument({ margin: 50 });
+    const buffers: Buffer[] = [];
+
+    doc.on('data', buffers.push.bind(buffers));
+    doc.on('end', () => resolve(Buffer.concat(buffers)));
+    doc.on('error', reject);
+
+    // Header
+    doc.fontSize(24).text('Factura de Arrendamiento', { align: 'center' });
+    doc.moveDown();
+    
+    doc.fontSize(16).text(invoice.number, { align: 'center' });
+    doc.moveDown(2);
+
+    // Invoice Information
+    doc.fontSize(12).text('Información de la factura', { underline: true });
+    doc.moveDown(0.5);
+    
+    const leftCol = 70;
+    const rightCol = 320;
+    let y = doc.y;
+
+    // Left column
+    doc.text('Inquilino', leftCol, y);
+    doc.fontSize(10).text(invoice.tenantContact?.fullName || 'N/A', leftCol, y + 20);
+    doc.text(invoice.tenantContact?.email || '', leftCol, y + 35);
+    
+    // Right column
+    doc.fontSize(12).text('Propiedad', rightCol, y);
+    doc.fontSize(10).text(invoice.contract?.property?.name || 'N/A', rightCol, y + 20);
+    doc.text(invoice.contract?.property?.address || '', rightCol, y + 35);
+
+    doc.moveDown(4);
+    y = doc.y;
+
+    // Dates
+    doc.fontSize(12).text('Fecha de emisión', leftCol, y);
+    doc.fontSize(10).text(new Date(invoice.issueDate).toLocaleDateString('es-ES'), leftCol, y + 20);
+    
+    doc.fontSize(12).text('Fecha de vencimiento', rightCol, y);
+    doc.fontSize(10).text(new Date(invoice.dueDate).toLocaleDateString('es-ES'), rightCol, y + 20);
+
+    doc.moveDown(3);
+
+    // Charges section
+    doc.fontSize(12).text('Conceptos facturados', { underline: true });
+    doc.moveDown(0.5);
+
+    if (invoice.charges && invoice.charges.length > 0) {
+      invoice.charges.forEach((charge: any) => {
+        doc.fontSize(10)
+           .text(charge.description, leftCol, doc.y, { width: 350, continued: true })
+           .text(`$${parseFloat(charge.amount).toLocaleString('es-CO')}`, { align: 'right' });
+        doc.moveDown(0.3);
+      });
+    }
+
+    doc.moveDown();
+    
+    // Totals
+    const startY = doc.y;
+    doc.moveTo(leftCol, startY).lineTo(520, startY).stroke();
+    doc.moveDown(0.5);
+
+    doc.fontSize(10)
+       .text('Subtotal', leftCol, doc.y, { width: 350, continued: true })
+       .text(`$${parseFloat(invoice.subtotal).toLocaleString('es-CO')}`, { align: 'right' });
+    doc.moveDown(0.5);
+
+    doc.fontSize(14).font('Helvetica-Bold')
+       .text('Total', leftCol, doc.y, { width: 350, continued: true })
+       .text(`$${parseFloat(invoice.totalAmount).toLocaleString('es-CO')}`, { align: 'right' });
+
+    doc.moveDown(2);
+
+    // Payment status
+    doc.fontSize(12).font('Helvetica').text('Estado de pago', { underline: true });
+    doc.moveDown(0.5);
+
+    doc.fontSize(10)
+       .text('Total facturado', leftCol, doc.y, { width: 350, continued: true })
+       .text(`$${parseFloat(invoice.totalAmount).toLocaleString('es-CO')}`, { align: 'right' });
+    doc.moveDown(0.3);
+
+    doc.text('Total pagado', leftCol, doc.y, { width: 350, continued: true })
+       .text(`$${parseFloat(invoice.amountPaid).toLocaleString('es-CO')}`, { align: 'right' });
+    doc.moveDown(0.3);
+
+    const balance = parseFloat(invoice.totalAmount) - parseFloat(invoice.amountPaid);
+    doc.fontSize(12).font('Helvetica-Bold')
+       .text('Saldo pendiente', leftCol, doc.y, { width: 350, continued: true })
+       .text(`$${balance.toLocaleString('es-CO')}`, { align: 'right' });
+
+    doc.end();
+  });
 }
