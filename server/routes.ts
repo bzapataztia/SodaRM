@@ -623,6 +623,24 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...req.body,
         tenantId: req.tenantId,
       });
+      
+      // Validate payment amount doesn't exceed invoice balance
+      const invoice = await storage.getInvoice(paymentData.invoiceId, req.tenantId);
+      if (!invoice) {
+        return res.status(404).json({ message: "Factura no encontrada" });
+      }
+      
+      const totalAmount = parseFloat(invoice.totalAmount);
+      const alreadyPaid = parseFloat(invoice.amountPaid);
+      const newPayment = parseFloat(paymentData.amount);
+      const balanceDue = totalAmount - alreadyPaid;
+      
+      if (newPayment > balanceDue) {
+        return res.status(400).json({ 
+          message: `El monto del pago ($${newPayment.toLocaleString()}) excede el saldo pendiente ($${balanceDue.toLocaleString()})` 
+        });
+      }
+      
       const payment = await storage.createPayment(paymentData);
       res.json(payment);
     } catch (error: any) {
@@ -644,10 +662,34 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/payments/:id", isAuthenticated, withUser, async (req: any, res) => {
     try {
-      const payment = await storage.updatePayment(req.params.id, req.tenantId, req.body);
-      if (!payment) {
+      const existingPayment = await storage.getPayment(req.params.id, req.tenantId);
+      if (!existingPayment) {
         return res.status(404).json({ message: "Payment not found" });
       }
+      
+      // If amount is being updated, validate it doesn't exceed invoice balance
+      if (req.body.amount) {
+        const invoice = await storage.getInvoice(existingPayment.invoiceId, req.tenantId);
+        if (!invoice) {
+          return res.status(404).json({ message: "Factura no encontrada" });
+        }
+        
+        const totalAmount = parseFloat(invoice.totalAmount);
+        const alreadyPaid = parseFloat(invoice.amountPaid);
+        const oldPaymentAmount = parseFloat(existingPayment.amount);
+        const newPaymentAmount = parseFloat(req.body.amount);
+        
+        // Calculate balance considering we're replacing the old payment
+        const balanceDue = totalAmount - alreadyPaid + oldPaymentAmount;
+        
+        if (newPaymentAmount > balanceDue) {
+          return res.status(400).json({ 
+            message: `El monto del pago ($${newPaymentAmount.toLocaleString()}) excede el saldo pendiente ($${balanceDue.toLocaleString()})` 
+          });
+        }
+      }
+      
+      const payment = await storage.updatePayment(req.params.id, req.tenantId, req.body);
       res.json(payment);
     } catch (error: any) {
       res.status(400).json({ message: error.message });

@@ -12,6 +12,17 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes (October 2025)
 
+### Payment Validation (October 1, 2025)
+- **Overpayment Prevention:** Added backend validation to prevent payments that exceed invoice balance. System validates both new payments and updates to ensure total paid never exceeds invoice total.
+- **Balance Calculation:** Payment endpoints now check invoice balance before accepting payments, preventing data inconsistencies.
+
+### UI/UX Improvements (October 1, 2025)
+- **Modal Z-Index Hierarchy:** Fixed dropdown menus appearing behind modals by implementing proper z-index layering:
+  - Dialog modals: z-50 (overlay), z-[100] (content)
+  - AlertDialog: z-[150] (overlay), z-[200] (content) - appears above regular modals
+  - Dropdowns/Selects/Popovers: z-[300] - always on top for proper interaction
+- **CSV Import/Export:** Added CSV import and export functionality for all modules (Contacts, Properties, Contracts, Invoices, Payments) with template download and comprehensive error handling.
+
 ### Invoice Management Enhancements
 - **PDF Generation:** Implemented invoice PDF download functionality using pdfkit library. Endpoint `/api/invoices/:id/pdf` generates professional PDF documents with complete invoice details including tenant info, property details, charges breakdown, and totals.
 - **Email Reminder Fix:** Corrected `/api/invoices/:id/remind` endpoint to properly load tenant contact before sending reminder emails, preventing null reference errors.
