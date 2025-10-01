@@ -203,14 +203,13 @@ function ContactFormDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Tipo de Documento</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || ''}>
+                    <Select onValueChange={field.onChange} value={field.value || undefined}>
                       <FormControl>
                         <SelectTrigger data-testid="select-docType">
-                          <SelectValue placeholder="Seleccionar tipo" />
+                          <SelectValue placeholder="Seleccionar tipo (opcional)" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">Sin especificar</SelectItem>
                         <SelectItem value="CC">CC - Cédula de Ciudadanía</SelectItem>
                         <SelectItem value="CE">CE - Cédula de Extranjería</SelectItem>
                         <SelectItem value="PP">PP - Pasaporte</SelectItem>

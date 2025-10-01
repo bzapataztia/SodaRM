@@ -254,14 +254,13 @@ function PropertyFormDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Propietario</FormLabel>
-                    <Select onValueChange={field.onChange} value={field.value || ''}>
+                    <Select onValueChange={field.onChange} value={field.value || undefined}>
                       <FormControl>
                         <SelectTrigger data-testid="select-owner">
-                          <SelectValue placeholder="Seleccionar propietario" />
+                          <SelectValue placeholder="Seleccionar propietario (opcional)" />
                         </SelectTrigger>
                       </FormControl>
                       <SelectContent>
-                        <SelectItem value="">Sin propietario</SelectItem>
                         {owners.map((owner) => (
                           <SelectItem key={owner.id} value={owner.id}>
                             {owner.fullName}
