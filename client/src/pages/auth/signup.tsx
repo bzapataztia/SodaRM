@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Checkbox } from '@/components/ui/checkbox';
+import logoPath from '@assets/logo_soda (1)_1759330032096.png';
 
 export default function SignupPage() {
   const [, setLocation] = useLocation();
@@ -67,8 +68,8 @@ export default function SignupPage() {
     <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 px-4 py-8">
       <div className="w-full max-w-2xl">
         <div className="text-center mb-8">
-          <div className="inline-flex items-center justify-center w-16 h-16 bg-primary rounded-xl mb-4 shadow-lg">
-            <i className="fas fa-building text-white text-2xl"></i>
+          <div className="inline-flex items-center justify-center mb-4">
+            <img src={logoPath} alt="Rental Manager Logo" className="h-16 w-auto" />
           </div>
           <h1 className="text-3xl font-bold text-gray-900 mb-2">Crea tu cuenta</h1>
           <p className="text-gray-600">Comienza a gestionar tus propiedades en minutos</p>

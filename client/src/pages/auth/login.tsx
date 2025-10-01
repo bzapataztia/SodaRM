@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
+import logoPath from '@assets/logo_soda (1)_1759330032096.png';
 
 export default function LoginPage() {
   const [, setLocation] = useLocation();
@@ -38,9 +39,8 @@ export default function LoginPage() {
       {/* Left Side - Branding */}
       <div className="hidden lg:flex lg:w-1/2 bg-primary text-primary-foreground p-12 flex-col justify-between relative overflow-hidden">
         <div className="relative z-10">
-          <div className="flex items-center space-x-2 mb-12">
-            <i className="fas fa-building text-3xl"></i>
-            <span className="text-2xl font-bold">Rental Manager</span>
+          <div className="flex items-center space-x-3 mb-12">
+            <img src={logoPath} alt="Rental Manager Logo" className="h-12 w-auto" />
           </div>
           
           <div className="space-y-6 max-w-md">
@@ -93,9 +93,8 @@ export default function LoginPage() {
       <div className="flex-1 flex items-center justify-center p-8">
         <div className="w-full max-w-md space-y-8">
           <div className="text-center lg:text-left">
-            <div className="lg:hidden flex items-center justify-center space-x-2 mb-6">
-              <i className="fas fa-building text-2xl text-primary"></i>
-              <span className="text-xl font-bold">Rental Manager</span>
+            <div className="lg:hidden flex items-center justify-center mb-6">
+              <img src={logoPath} alt="Rental Manager Logo" className="h-10 w-auto" />
             </div>
             <h2 className="text-3xl font-bold tracking-tight">Iniciar sesión</h2>
             <p className="mt-2 text-sm text-muted-foreground">
