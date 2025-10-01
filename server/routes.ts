@@ -7,11 +7,18 @@ import { invoices, insertTenantSchema, updateTenantLogoSchema, insertContactSche
 import { createMonthlyInvoices, recalcInvoiceTotals } from "./services/invoiceEngine";
 import { sendReminderD3, sendReminderD1 } from "./services/emailService";
 import { createCheckoutSession, handleWebhook, createCustomerPortalSession } from "./services/stripeService";
-import { processOCR, approveOCRAndCreateCharge } from "./services/ocrService";
+import { processOCRAndSave, approveOCRAndCreateCharge } from "./services/ocrService";
 import { generateInsurerMonthlyReport } from "./services/pdfService";
 import { importContactsCSV, importPropertiesCSV, importPaymentsCSV, importContractsCSV, importInvoicesCSV, generateContactsTemplate, generatePropertiesTemplate, generatePaymentsTemplate, generateContractsTemplate, generateInvoicesTemplate } from "./services/csvService";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import Stripe from "stripe";
+import multer from "multer";
+
+// Configure multer for file uploads
+const upload = multer({ 
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 10 * 1024 * 1024 } // 10MB max
+});
 
 // Helper middleware to load user and tenant info
 async function withUser(req: any, res: any, next: any) {
@@ -818,20 +825,20 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // OCR
-  app.post("/api/ocr/upload", isAuthenticated, withUser, async (req: any, res) => {
+  app.post("/api/ocr/process-invoice", isAuthenticated, withUser, upload.single('file'), async (req: any, res) => {
     try {
-      // This would handle file upload and return URL
-      // Simplified for now
-      const { fileUrl } = req.body;
-      
-      if (!fileUrl) {
-        return res.status(400).json({ message: "File URL required" });
+      if (!req.file) {
+        return res.status(400).json({ message: "No file uploaded" });
       }
 
-      const ocrLog = await processOCR(fileUrl, req.tenantId);
-      res.json(ocrLog);
+      const fileBuffer = req.file.buffer;
+      const fileName = req.file.originalname;
+      const mimeType = req.file.mimetype;
+
+      const result = await processOCRAndSave(fileBuffer, req.tenantId, fileName, mimeType);
+      res.json(result);
     } catch (error: any) {
-      res.status(500).json({ message: error.message });
+      res.status(400).json({ message: error.message });
     }
   });
 
@@ -847,8 +854,8 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.post("/api/ocr/:id/approve", isAuthenticated, withUser, async (req: any, res) => {
     try {
-      const { invoiceId, description } = req.body;
-      await approveOCRAndCreateCharge(req.params.id, invoiceId, description);
+      const { invoiceId, description, amount } = req.body;
+      await approveOCRAndCreateCharge(req.params.id, invoiceId, description, amount);
       res.json({ message: "OCR approved and charge created" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });

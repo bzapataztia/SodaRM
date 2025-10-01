@@ -16,7 +16,6 @@ export default function Sidebar() {
 
   const adminItems = [
     { path: '/insurers', icon: 'fa-shield-halved', label: 'Aseguradoras' },
-    { path: '/ocr-inbox', icon: 'fa-scanner', label: 'OCR Inbox' },
   ];
 
   const settingsItems = [

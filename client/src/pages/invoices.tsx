@@ -14,7 +14,7 @@ import { insertInvoiceSchema, type Invoice, type Contract, type Contact } from '
 import { z } from 'zod';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Pencil, Trash2, Eye, Download, Upload } from 'lucide-react';
+import { Plus, Pencil, Trash2, Eye, Download, Upload, FileText } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -401,6 +401,9 @@ export default function InvoicesPage() {
   const [editingInvoice, setEditingInvoice] = useState<Invoice | undefined>();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [deleteInvoice, setDeleteInvoice] = useState<Invoice | undefined>();
+  const [isOCRModalOpen, setIsOCRModalOpen] = useState(false);
+  const [ocrFile, setOcrFile] = useState<File | null>(null);
+  const [ocrResult, setOcrResult] = useState<any>(null);
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiRequest('DELETE', `/api/invoices/${id}`),
@@ -440,6 +443,47 @@ export default function InvoicesPage() {
       toast({ title: 'Error al importar CSV', variant: 'destructive' });
     },
   });
+
+  const ocrMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const formData = new FormData();
+      formData.append('file', file);
+      
+      const response = await fetch('/api/ocr/process-invoice', {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+      
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.message || 'Error al procesar OCR');
+      }
+      
+      return response.json();
+    },
+    onSuccess: (data: any) => {
+      setOcrResult(data);
+      toast({ title: 'OCR procesado exitosamente' });
+    },
+    onError: (error: Error) => {
+      toast({ 
+        title: 'Error al procesar OCR', 
+        description: error.message,
+        variant: 'destructive' 
+      });
+    },
+  });
+
+  const handleOCRFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      setOcrFile(file);
+      setOcrResult(null);
+      ocrMutation.mutate(file);
+      e.target.value = '';
+    }
+  };
 
   const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
@@ -497,6 +541,10 @@ export default function InvoicesPage() {
                   onChange={handleFileUpload}
                   className="hidden"
                 />
+                <Button variant="outline" onClick={() => setIsOCRModalOpen(true)} data-testid="button-upload-invoice-ocr">
+                  <FileText className="w-4 h-4 mr-2" />
+                  Subir Factura
+                </Button>
                 <Button onClick={() => setIsCreateOpen(true)} data-testid="button-create">
                   <Plus className="w-4 h-4 mr-2" />
                   Nueva Factura
@@ -640,6 +688,126 @@ export default function InvoicesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={isOCRModalOpen} onOpenChange={setIsOCRModalOpen}>
+        <DialogContent className="max-w-2xl">
+          <DialogHeader>
+            <DialogTitle>Procesar Factura con OCR</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <p className="text-sm text-muted-foreground mb-4">
+                Sube una imagen de una factura de servicios (luz, agua, gas) para extraer automáticamente los datos.
+              </p>
+              
+              <Button
+                variant="outline"
+                onClick={() => document.getElementById('ocr-file-upload')?.click()}
+                disabled={ocrMutation.isPending}
+                data-testid="button-select-file"
+                className="w-full"
+              >
+                <Upload className="w-4 h-4 mr-2" />
+                {ocrMutation.isPending ? 'Procesando...' : 'Seleccionar Imagen'}
+              </Button>
+              <input
+                id="ocr-file-upload"
+                type="file"
+                accept="image/*"
+                onChange={handleOCRFileSelect}
+                className="hidden"
+              />
+              <p className="text-xs text-muted-foreground mt-2">
+                Formatos soportados: JPG, PNG, GIF. Tamaño máximo: 10MB
+              </p>
+            </div>
+
+            {ocrMutation.isPending && (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
+              </div>
+            )}
+
+            {ocrResult && (
+              <div className="space-y-4 border rounded-lg p-4 bg-muted/50">
+                <div>
+                  <h3 className="font-semibold mb-2">Datos Extraídos</h3>
+                  <div className="grid grid-cols-2 gap-2 text-sm">
+                    {ocrResult.parsedData?.provider && (
+                      <div>
+                        <span className="text-muted-foreground">Proveedor:</span>
+                        <span className="ml-2 font-medium">{ocrResult.parsedData.provider}</span>
+                      </div>
+                    )}
+                    {ocrResult.parsedData?.total && (
+                      <div>
+                        <span className="text-muted-foreground">Total:</span>
+                        <span className="ml-2 font-medium">${ocrResult.parsedData.total}</span>
+                      </div>
+                    )}
+                    {ocrResult.parsedData?.period && (
+                      <div>
+                        <span className="text-muted-foreground">Período:</span>
+                        <span className="ml-2 font-medium">{ocrResult.parsedData.period}</span>
+                      </div>
+                    )}
+                    {ocrResult.parsedData?.consumption && (
+                      <div>
+                        <span className="text-muted-foreground">Consumo:</span>
+                        <span className="ml-2 font-medium">{ocrResult.parsedData.consumption}</span>
+                      </div>
+                    )}
+                    {ocrResult.parsedData?.accountNumber && (
+                      <div>
+                        <span className="text-muted-foreground">Cuenta:</span>
+                        <span className="ml-2 font-medium">{ocrResult.parsedData.accountNumber}</span>
+                      </div>
+                    )}
+                  </div>
+                  <div className="mt-3">
+                    <span className="text-xs text-muted-foreground">
+                      Confianza: {ocrResult.confidence > 70 ? '🟢 Alta' : ocrResult.confidence > 50 ? '🟡 Media' : '🔴 Baja'}
+                      {' '}({Math.round(ocrResult.confidence)}%)
+                    </span>
+                  </div>
+                </div>
+
+                <div className="border-t pt-4">
+                  <h4 className="text-sm font-semibold mb-2">Texto Completo</h4>
+                  <div className="max-h-40 overflow-y-auto bg-background rounded p-3 text-xs font-mono">
+                    {ocrResult.rawText}
+                  </div>
+                </div>
+
+                <div className="flex justify-end gap-2 pt-4">
+                  <Button
+                    variant="outline"
+                    onClick={() => {
+                      setIsOCRModalOpen(false);
+                      setOcrResult(null);
+                      setOcrFile(null);
+                    }}
+                    data-testid="button-cancel-ocr"
+                  >
+                    Cerrar
+                  </Button>
+                  <Button
+                    onClick={() => {
+                      toast({ 
+                        title: 'Funcionalidad en desarrollo',
+                        description: 'Próximamente podrás aprobar y crear cargos automáticamente desde aquí.'
+                      });
+                    }}
+                    data-testid="button-approve-ocr"
+                  >
+                    Aprobar y Crear Cargo
+                  </Button>
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

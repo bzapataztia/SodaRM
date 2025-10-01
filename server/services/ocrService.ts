@@ -1,81 +1,113 @@
-import { 
-  TextractClient, 
-  AnalyzeDocumentCommand,
-  FeatureType 
-} from "@aws-sdk/client-textract";
+import { createWorker, type Worker } from 'tesseract.js';
 import { db } from "../db";
 import { ocrLogs, invoiceCharges } from "@shared/schema";
 import { recalcInvoiceTotals } from "./invoiceEngine";
 
-const textract = new TextractClient({
-  region: process.env.AWS_REGION || 'us-east-1',
-  credentials: {
-    accessKeyId: process.env.AWS_ACCESS_KEY_ID || '',
-    secretAccessKey: process.env.AWS_SECRET_ACCESS_KEY || '',
-  },
-});
+interface OCRResult {
+  rawText: string;
+  parsedData: {
+    provider?: string;
+    total?: string;
+    period?: string;
+    consumption?: string;
+    accountNumber?: string;
+  };
+  confidence: number;
+}
 
-export async function processOCR(fileUrl: string, tenantId: string) {
-  try {
-    // Download file from storage
-    const response = await fetch(fileUrl);
-    const arrayBuffer = await response.arrayBuffer();
-    const bytes = new Uint8Array(arrayBuffer);
+let sharedWorker: Worker | null = null;
 
-    const command = new AnalyzeDocumentCommand({
-      Document: {
-        Bytes: bytes,
+async function getWorker(): Promise<Worker> {
+  if (!sharedWorker) {
+    console.log('[OCR] Initializing Tesseract worker...');
+    sharedWorker = await createWorker('spa', 1, {
+      logger: (m) => {
+        if (m.status === 'recognizing text') {
+          console.log(`[OCR] Progress: ${Math.round(m.progress * 100)}%`);
+        }
       },
-      FeatureTypes: [FeatureType.FORMS, FeatureType.TABLES],
     });
+    console.log('[OCR] Tesseract worker ready');
+  }
+  return sharedWorker;
+}
 
-    const result = await textract.send(command);
-    
-    // Extract key-value pairs and tables
-    const extractedData = extractKeyValues(result);
-    
-    // Determine period, amount, and reference
-    const period = extractPeriod(extractedData);
-    const amount = extractAmount(extractedData);
-    const reference = extractReference(extractedData);
-    
-    // Calculate confidence
-    const confidence = calculateConfidence(result);
+export async function processInvoiceOCR(fileBuffer: Buffer, mimeType: string): Promise<OCRResult> {
+  if (mimeType === 'application/pdf') {
+    throw new Error('PDF files are not supported yet. Please upload an image file (JPG, PNG, etc.)');
+  }
 
+  if (!mimeType.startsWith('image/')) {
+    throw new Error('Only image files are supported (JPG, PNG, GIF, etc.)');
+  }
+
+  const worker = await getWorker();
+  
+  const { data: { text, confidence } } = await worker.recognize(fileBuffer);
+  
+  const parsedData = parseUtilityBillData(text);
+  
+  return {
+    rawText: text.trim(),
+    parsedData,
+    confidence: confidence || 0,
+  };
+}
+
+export async function processOCRAndSave(
+  fileBuffer: Buffer, 
+  tenantId: string,
+  fileName: string,
+  mimeType: string
+): Promise<any> {
+  try {
+    const ocrResult = await processInvoiceOCR(fileBuffer, mimeType);
+    
+    const confidenceLevel = ocrResult.confidence > 70 ? 'high' : 
+                           ocrResult.confidence > 50 ? 'medium' : 'low';
+    
+    const status = ocrResult.confidence > 70 ? 'ok' : 'needs_review';
+    
     const [ocrLog] = await db.insert(ocrLogs).values({
       tenantId,
-      fileUrl,
-      provider: 'textract',
-      confidence: confidence.toFixed(2),
-      status: confidence > 80 ? 'ok' : 'needs_review',
-      rawJson: result,
-      extractedPeriodStart: period?.start,
-      extractedPeriodEnd: period?.end,
-      extractedAmount: amount?.toString(),
-      extractedReference: reference,
-      message: confidence > 80 ? 'Procesado correctamente' : 'Requiere revisión manual',
+      fileUrl: fileName,
+      provider: 'tesseract',
+      confidence: ocrResult.confidence.toFixed(2),
+      status,
+      rawJson: {
+        rawText: ocrResult.rawText,
+        parsedData: ocrResult.parsedData,
+      },
+      extractedAmount: ocrResult.parsedData.total || null,
+      extractedReference: ocrResult.parsedData.accountNumber || null,
+      message: status === 'ok' ? 'Procesado correctamente' : 'Requiere revisión manual',
     }).returning();
 
-    return ocrLog;
+    return {
+      ...ocrLog,
+      parsedData: ocrResult.parsedData,
+      rawText: ocrResult.rawText,
+    };
   } catch (error: any) {
-    console.error('OCR Error:', error);
+    console.error('[OCR] Error:', error);
     
     await db.insert(ocrLogs).values({
       tenantId,
-      fileUrl,
-      provider: 'textract',
+      fileUrl: fileName,
+      provider: 'tesseract',
       status: 'error',
       message: error.message,
     });
 
-    throw new Error(`OCR processing failed: ${error.message}`);
+    throw error;
   }
 }
 
 export async function approveOCRAndCreateCharge(
   ocrLogId: string,
   invoiceId: string,
-  description?: string
+  description?: string,
+  amount?: string
 ) {
   const ocrLog = await db.query.ocrLogs.findFirst({
     where: (ocrLogs, { eq }) => eq(ocrLogs.id, ocrLogId),
@@ -85,14 +117,16 @@ export async function approveOCRAndCreateCharge(
     throw new Error('OCR log not found');
   }
 
-  if (!ocrLog.extractedAmount) {
-    throw new Error('No amount extracted from OCR');
+  const chargeAmount = amount || ocrLog.extractedAmount;
+  
+  if (!chargeAmount) {
+    throw new Error('No amount provided or extracted from OCR');
   }
 
   await db.insert(invoiceCharges).values({
     invoiceId,
     description: description || `Cargo adicional - ${ocrLog.extractedReference || 'Servicios'}`,
-    amount: ocrLog.extractedAmount,
+    amount: chargeAmount,
   });
 
   await recalcInvoiceTotals(invoiceId);
@@ -100,100 +134,73 @@ export async function approveOCRAndCreateCharge(
   return { success: true };
 }
 
-function extractKeyValues(result: any) {
-  const keyValues: Record<string, string> = {};
-  
-  if (!result.Blocks) return keyValues;
+function parseUtilityBillData(text: string): OCRResult['parsedData'] {
+  const data: OCRResult['parsedData'] = {};
 
-  for (const block of result.Blocks) {
-    if (block.BlockType === 'KEY_VALUE_SET' && block.EntityTypes?.includes('KEY')) {
-      const key = getBlockText(block, result.Blocks);
-      const valueBlock = block.Relationships?.find((r: any) => r.Type === 'VALUE');
-      
-      if (valueBlock?.Ids?.[0]) {
-        const value = getBlockText(
-          result.Blocks.find((b: any) => b.Id === valueBlock.Ids[0]),
-          result.Blocks
-        );
-        keyValues[key.toLowerCase()] = value;
-      }
+  const providerPatterns = [
+    /CFE|Comisi[oó]n Federal de Electricidad/i,
+    /Aguascalientes|CCAPAMA/i,
+    /Naturgy|Gas Natural/i,
+    /Telmex|Telcel|Total Play/i,
+    /Izzi|Megacable/i,
+  ];
+
+  for (const pattern of providerPatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      data.provider = match[0];
+      break;
     }
   }
 
-  return keyValues;
-}
+  const totalPatterns = [
+    /Total\s*a?\s*[Pp]agar\s*:?\s*\$?\s*([\d,]+\.?\d{0,2})/i,
+    /Total\s*:?\s*\$?\s*([\d,]+\.?\d{0,2})/i,
+    /Importe\s*[Tt]otal\s*:?\s*\$?\s*([\d,]+\.?\d{0,2})/i,
+  ];
 
-function getBlockText(block: any, allBlocks: any[]) {
-  if (!block?.Relationships) return '';
-  
-  const childIds = block.Relationships.find((r: any) => r.Type === 'CHILD')?.Ids || [];
-  return childIds
-    .map((id: string) => allBlocks.find((b: any) => b.Id === id)?.Text || '')
-    .join(' ');
-}
-
-function extractPeriod(data: Record<string, string>) {
-  const periodKeys = ['periodo', 'period', 'mes', 'fecha'];
-  
-  for (const key of periodKeys) {
-    for (const [k, v] of Object.entries(data)) {
-      if (k.includes(key) && v) {
-        // Try to parse date
-        const dateMatch = v.match(/(\d{1,2})\/(\d{4})|(\w+)\s+(\d{4})/i);
-        if (dateMatch) {
-          // Simple parsing - enhance as needed
-          return {
-            start: new Date().toISOString().split('T')[0],
-            end: new Date().toISOString().split('T')[0],
-          };
-        }
-      }
+  for (const pattern of totalPatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      data.total = match[1].replace(',', '');
+      break;
     }
   }
-  return null;
-}
 
-function extractAmount(data: Record<string, string>) {
-  const amountKeys = ['total', 'valor', 'monto', 'amount', 'pagar'];
-  
-  for (const key of amountKeys) {
-    for (const [k, v] of Object.entries(data)) {
-      if (k.includes(key) && v) {
-        const amountMatch = v.match(/[\d,]+\.?\d*/);
-        if (amountMatch) {
-          return parseFloat(amountMatch[0].replace(/,/g, ''));
-        }
-      }
+  const periodPattern = /[Pp]er[ií]odo\s*:?\s*(\d{2}[-\/]\d{2}[-\/]\d{2,4})\s*[-a]\s*(\d{2}[-\/]\d{2}[-\/]\d{2,4})/i;
+  const periodMatch = text.match(periodPattern);
+  if (periodMatch) {
+    data.period = `${periodMatch[1]} - ${periodMatch[2]}`;
+  }
+
+  const consumptionPatterns = [
+    /Consumo\s*:?\s*(\d+)\s*kWh/i,
+    /(\d+)\s*kWh/i,
+    /Consumo\s*:?\s*(\d+)\s*m[3³]/i,
+    /(\d+)\s*m[3³]/i,
+  ];
+
+  for (const pattern of consumptionPatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      data.consumption = match[1];
+      break;
     }
   }
-  return null;
-}
 
-function extractReference(data: Record<string, string>) {
-  const refKeys = ['referencia', 'ref', 'numero', 'number', 'nro'];
-  
-  for (const key of refKeys) {
-    for (const [k, v] of Object.entries(data)) {
-      if (k.includes(key) && v) {
-        return v;
-      }
+  const accountPatterns = [
+    /N[uú]mero\s*de\s*[Cc]uenta\s*:?\s*([\d\-]+)/i,
+    /Cuenta\s*:?\s*([\d\-]+)/i,
+    /N[uú]m\.\s*[Cc]liente\s*:?\s*([\d\-]+)/i,
+  ];
+
+  for (const pattern of accountPatterns) {
+    const match = text.match(pattern);
+    if (match) {
+      data.accountNumber = match[1];
+      break;
     }
   }
-  return null;
-}
 
-function calculateConfidence(result: any) {
-  if (!result.Blocks) return 0;
-  
-  let totalConfidence = 0;
-  let count = 0;
-  
-  for (const block of result.Blocks) {
-    if (block.Confidence) {
-      totalConfidence += block.Confidence;
-      count++;
-    }
-  }
-  
-  return count > 0 ? totalConfidence / count : 0;
+  return data;
 }
