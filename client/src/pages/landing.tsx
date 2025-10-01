@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import logoPath from '@assets/logo_soda (1)_1759330032096.png';
 import { Building2, FileText, Bell, BarChart3 } from 'lucide-react';
+import { SiGoogle, SiGithub, SiApple } from 'react-icons/si';
 
 export default function LandingPage() {
   return (
@@ -20,10 +21,24 @@ export default function LandingPage() {
             size="lg"
             onClick={() => window.location.href = '/api/login'}
             data-testid="button-login"
-            className="text-lg px-8 py-6"
+            className="text-lg px-8 py-6 mb-4"
           >
-            Iniciar sesión con Google, GitHub o Apple
+            Iniciar sesión
           </Button>
+          <div className="flex items-center justify-center gap-4 text-gray-600">
+            <span className="text-sm">Disponible con:</span>
+            <div className="flex gap-3">
+              <div className="w-8 h-8 flex items-center justify-center">
+                <SiGoogle className="w-6 h-6" />
+              </div>
+              <div className="w-8 h-8 flex items-center justify-center">
+                <SiGithub className="w-6 h-6" />
+              </div>
+              <div className="w-8 h-8 flex items-center justify-center">
+                <SiApple className="w-6 h-6" />
+              </div>
+            </div>
+          </div>
         </div>
 
         <div className="grid md:grid-cols-2 lg:grid-cols-4 gap-8 max-w-6xl mx-auto">
