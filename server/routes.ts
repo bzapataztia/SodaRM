@@ -9,7 +9,7 @@ import { sendReminderD3, sendReminderD1 } from "./services/emailService";
 import { createCheckoutSession, handleWebhook, createCustomerPortalSession } from "./services/stripeService";
 import { processOCR, approveOCRAndCreateCharge } from "./services/ocrService";
 import { generateInsurerMonthlyReport } from "./services/pdfService";
-import { importContactsCSV, importPropertiesCSV, importPaymentsCSV, generateContactsTemplate, generatePropertiesTemplate, generatePaymentsTemplate } from "./services/csvService";
+import { importContactsCSV, importPropertiesCSV, importPaymentsCSV, importContractsCSV, importInvoicesCSV, generateContactsTemplate, generatePropertiesTemplate, generatePaymentsTemplate, generateContractsTemplate, generateInvoicesTemplate } from "./services/csvService";
 import { setupAuth, isAuthenticated } from "./replitAuth";
 import Stripe from "stripe";
 
@@ -192,6 +192,32 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.post("/api/import/contracts", isAuthenticated, withUser, async (req: any, res) => {
+    try {
+      const { csvContent } = req.body;
+      if (!csvContent) {
+        return res.status(400).json({ message: "CSV content is required" });
+      }
+      const result = await importContractsCSV(csvContent, req.tenantId);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/import/invoices", isAuthenticated, withUser, async (req: any, res) => {
+    try {
+      const { csvContent } = req.body;
+      if (!csvContent) {
+        return res.status(400).json({ message: "CSV content is required" });
+      }
+      const result = await importInvoicesCSV(csvContent, req.tenantId);
+      res.json(result);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   app.get("/api/templates/contacts.csv", (req, res) => {
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename="plantilla_contactos.csv"');
@@ -208,6 +234,18 @@ export async function registerRoutes(app: Express): Promise<Server> {
     res.setHeader('Content-Type', 'text/csv');
     res.setHeader('Content-Disposition', 'attachment; filename="plantilla_pagos.csv"');
     res.send(generatePaymentsTemplate());
+  });
+
+  app.get("/api/templates/contracts.csv", (req, res) => {
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="plantilla_contratos.csv"');
+    res.send(generateContractsTemplate());
+  });
+
+  app.get("/api/templates/invoices.csv", (req, res) => {
+    res.setHeader('Content-Type', 'text/csv');
+    res.setHeader('Content-Disposition', 'attachment; filename="plantilla_facturas.csv"');
+    res.send(generateInvoicesTemplate());
   });
 
   // Contacts
