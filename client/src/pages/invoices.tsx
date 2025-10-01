@@ -184,7 +184,7 @@ function InvoiceFormDialog({
                           <SelectValue placeholder="Seleccionar estado" />
                         </SelectTrigger>
                       </FormControl>
-                      <SelectContent>
+                      <SelectContent position="popper">
                         <SelectItem value="draft">Borrador</SelectItem>
                         <SelectItem value="issued">Emitida</SelectItem>
                         <SelectItem value="partial">Parcial</SelectItem>
@@ -210,7 +210,7 @@ function InvoiceFormDialog({
                         <SelectValue placeholder="Seleccionar contrato" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
+                    <SelectContent modal={false}>
                       {contracts.map((contract) => (
                         <SelectItem key={contract.id} value={contract.id}>
                           {contract.number}
@@ -235,7 +235,7 @@ function InvoiceFormDialog({
                         <SelectValue placeholder="Seleccionar inquilino" />
                       </SelectTrigger>
                     </FormControl>
-                    <SelectContent>
+                    <SelectContent modal={false}>
                       {tenants.map((tenant) => (
                         <SelectItem key={tenant.id} value={tenant.id}>
                           {tenant.fullName}
