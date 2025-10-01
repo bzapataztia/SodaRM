@@ -18,11 +18,7 @@ export default function OnboardingPage() {
     setIsLoading(true);
 
     try {
-      await apiRequest('/api/auth/onboard', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ companyName }),
-      });
+      await apiRequest('POST', '/api/auth/onboard', { companyName });
 
       // Invalidate user query to refresh data
       await queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
