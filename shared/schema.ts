@@ -319,6 +319,9 @@ export const policiesRelations = relations(policies, ({ one }) => ({
 
 // Insert Schemas
 export const insertTenantSchema = createInsertSchema(tenants).omit({ id: true, createdAt: true });
+export const updateTenantLogoSchema = z.object({
+  logo: z.string().optional(),
+}).strict();
 export const insertUserSchema = createInsertSchema(users).omit({ createdAt: true, updatedAt: true });
 export const insertContactSchema = createInsertSchema(contacts).omit({ id: true, createdAt: true });
 export const insertPropertySchema = createInsertSchema(properties).omit({ id: true, createdAt: true });

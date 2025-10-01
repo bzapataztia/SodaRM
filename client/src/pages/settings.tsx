@@ -153,11 +153,11 @@ export default function SettingsPage() {
                 <h2 className="text-lg font-semibold">Logo de la Empresa</h2>
               </div>
               
-              {(tenantData?.logo || logoPreview) && (
+              {((tenantData as any)?.logo || logoPreview) && (
                 <div className="flex items-center gap-4 mb-4">
                   <div className="relative">
                     <img 
-                      src={logoPreview || tenantData?.logo} 
+                      src={logoPreview || (tenantData as any)?.logo} 
                       alt="Logo" 
                       className="h-24 w-24 object-contain rounded-lg border bg-white p-2"
                       data-testid="img-logo-preview"
@@ -174,7 +174,7 @@ export default function SettingsPage() {
                       </Button>
                     )}
                   </div>
-                  {tenantData?.logo && !logoPreview && (
+                  {(tenantData as any)?.logo && !logoPreview && (
                     <Button
                       variant="outline"
                       onClick={handleRemoveCurrentLogo}

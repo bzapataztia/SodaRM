@@ -1,7 +1,7 @@
 import type { Express } from "express";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
-import { insertTenantSchema, insertContactSchema, insertPropertySchema, insertContractSchema, insertInvoiceSchema, insertPaymentSchema, insertInsurerSchema, insertPolicySchema } from "@shared/schema";
+import { insertTenantSchema, updateTenantLogoSchema, insertContactSchema, insertPropertySchema, insertContractSchema, insertInvoiceSchema, insertPaymentSchema, insertInsurerSchema, insertPolicySchema } from "@shared/schema";
 import { createMonthlyInvoices, recalcInvoiceTotals } from "./services/invoiceEngine";
 import { sendReminderD3, sendReminderD1 } from "./services/emailService";
 import { createCheckoutSession, handleWebhook, createCustomerPortalSession } from "./services/stripeService";
@@ -137,7 +137,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/tenants/current", isAuthenticated, withUser, async (req: any, res) => {
     try {
-      const tenant = await storage.updateTenant(req.tenantId, req.body);
+      // Only allow updating the logo field for security
+      const validatedData = updateTenantLogoSchema.parse(req.body);
+      const tenant = await storage.updateTenant(req.tenantId, validatedData);
       if (!tenant) {
         return res.status(404).json({ message: "Tenant not found" });
       }
