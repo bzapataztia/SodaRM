@@ -13,7 +13,7 @@ import { insertPropertySchema, type Property, type Contact } from '@shared/schem
 import { z } from 'zod';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, Download, Upload } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -319,6 +319,45 @@ export default function PropertiesPage() {
     },
   });
 
+  const importMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const text = await file.text();
+      return apiRequest('POST', '/api/import/properties', { csvContent: text });
+    },
+    onSuccess: (response: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
+      if (response.errors.length > 0) {
+        const errorList = response.errors.map((err: any) => 
+          `Fila ${err.row}: ${err.error}`
+        ).join('\n');
+        toast({ 
+          title: `Importación parcial: ${response.success}/${response.total} propiedades importadas`,
+          description: errorList,
+          variant: 'destructive',
+        });
+      } else {
+        toast({ 
+          title: `Importación exitosa: ${response.success} propiedades importadas`,
+        });
+      }
+    },
+    onError: () => {
+      toast({ title: 'Error al importar CSV', variant: 'destructive' });
+    },
+  });
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      importMutation.mutate(file);
+      e.target.value = '';
+    }
+  };
+
+  const downloadTemplate = () => {
+    window.location.href = '/api/templates/properties.csv';
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -339,10 +378,27 @@ export default function PropertiesPage() {
                 <h1 className="text-3xl font-bold tracking-tight">Propiedades</h1>
                 <p className="text-muted-foreground mt-1">Administra tu portafolio de propiedades</p>
               </div>
-              <Button onClick={() => setIsCreateOpen(true)} data-testid="button-create">
-                <Plus className="w-4 h-4 mr-2" />
-                Nueva Propiedad
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={downloadTemplate} data-testid="button-download-template">
+                  <Download className="w-4 h-4 mr-2" />
+                  Descargar Plantilla
+                </Button>
+                <Button variant="outline" onClick={() => document.getElementById('csv-upload-properties')?.click()} disabled={importMutation.isPending} data-testid="button-import-csv">
+                  <Upload className="w-4 h-4 mr-2" />
+                  {importMutation.isPending ? 'Importando...' : 'Importar CSV'}
+                </Button>
+                <input
+                  id="csv-upload-properties"
+                  type="file"
+                  accept=".csv"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+                <Button onClick={() => setIsCreateOpen(true)} data-testid="button-create">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Nueva Propiedad
+                </Button>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">

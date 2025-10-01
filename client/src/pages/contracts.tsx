@@ -13,7 +13,7 @@ import { insertContractSchema, type Contract, type Contact, type Property } from
 import { z } from 'zod';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Pencil, Trash2, Play } from 'lucide-react';
+import { Plus, Pencil, Trash2, Play, Download, Upload } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -420,6 +420,45 @@ export default function ContractsPage() {
     },
   });
 
+  const importMutation = useMutation({
+    mutationFn: async (file: File) => {
+      const text = await file.text();
+      return apiRequest('POST', '/api/import/contracts', { csvContent: text });
+    },
+    onSuccess: (response: any) => {
+      queryClient.invalidateQueries({ queryKey: ['/api/contracts'] });
+      if (response.errors.length > 0) {
+        const errorList = response.errors.map((err: any) => 
+          `Fila ${err.row}: ${err.error}`
+        ).join('\n');
+        toast({ 
+          title: `Importación parcial: ${response.success}/${response.total} contratos importados`,
+          description: errorList,
+          variant: 'destructive',
+        });
+      } else {
+        toast({ 
+          title: `Importación exitosa: ${response.success} contratos importados`,
+        });
+      }
+    },
+    onError: () => {
+      toast({ title: 'Error al importar CSV', variant: 'destructive' });
+    },
+  });
+
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      importMutation.mutate(file);
+      e.target.value = '';
+    }
+  };
+
+  const downloadTemplate = () => {
+    window.location.href = '/api/templates/contracts.csv';
+  };
+
   if (isLoading) {
     return (
       <div className="min-h-screen flex items-center justify-center">
@@ -440,10 +479,27 @@ export default function ContractsPage() {
                 <h1 className="text-3xl font-bold tracking-tight">Contratos</h1>
                 <p className="text-muted-foreground mt-1">Gestiona los contratos de arrendamiento</p>
               </div>
-              <Button onClick={() => setIsCreateOpen(true)} data-testid="button-create">
-                <Plus className="w-4 h-4 mr-2" />
-                Nuevo Contrato
-              </Button>
+              <div className="flex gap-2">
+                <Button variant="outline" onClick={downloadTemplate} data-testid="button-download-template">
+                  <Download className="w-4 h-4 mr-2" />
+                  Descargar Plantilla
+                </Button>
+                <Button variant="outline" onClick={() => document.getElementById('csv-upload')?.click()} disabled={importMutation.isPending} data-testid="button-import-csv">
+                  <Upload className="w-4 h-4 mr-2" />
+                  {importMutation.isPending ? 'Importando...' : 'Importar CSV'}
+                </Button>
+                <input
+                  id="csv-upload"
+                  type="file"
+                  accept=".csv"
+                  onChange={handleFileUpload}
+                  className="hidden"
+                />
+                <Button onClick={() => setIsCreateOpen(true)} data-testid="button-create">
+                  <Plus className="w-4 h-4 mr-2" />
+                  Nuevo Contrato
+                </Button>
+              </div>
             </div>
 
             <div className="bg-card rounded-lg border border-border overflow-hidden">
