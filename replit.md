@@ -10,6 +10,14 @@ The system is built as a modern full-stack web application with a React frontend
 
 Preferred communication style: Simple, everyday language.
 
+## Recent Changes (October 2025)
+
+### Invoice Management Enhancements
+- **PDF Generation:** Implemented invoice PDF download functionality using pdfkit library. Endpoint `/api/invoices/:id/pdf` generates professional PDF documents with complete invoice details including tenant info, property details, charges breakdown, and totals.
+- **Email Reminder Fix:** Corrected `/api/invoices/:id/remind` endpoint to properly load tenant contact before sending reminder emails, preventing null reference errors.
+- **Dashboard Recovery Calculation:** Updated dashboard stats to calculate recovery percentage globally across all invoices (not just current month), providing accurate overall collection performance metrics.
+- **Invoice Status Logic:** Automatic status calculation based on payment amounts: 'paid' (fully paid), 'partial' (partially paid), 'issued' (unpaid).
+
 ## System Architecture
 
 ### Frontend Architecture
