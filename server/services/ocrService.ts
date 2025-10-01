@@ -1,7 +1,17 @@
 import { createWorker, type Worker } from 'tesseract.js';
+import { createCanvas } from 'canvas';
 import { db } from "../db";
 import { ocrLogs, invoiceCharges } from "@shared/schema";
 import { recalcInvoiceTotals } from "./invoiceEngine";
+
+let pdfjsLib: any = null;
+
+async function getPdfJS() {
+  if (!pdfjsLib) {
+    pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+  }
+  return pdfjsLib;
+}
 
 interface OCRResult {
   rawText: string;
@@ -32,25 +42,70 @@ async function getWorker(): Promise<Worker> {
   return sharedWorker;
 }
 
-export async function processInvoiceOCR(fileBuffer: Buffer, mimeType: string): Promise<OCRResult> {
-  if (mimeType === 'application/pdf') {
-    throw new Error('PDF files are not supported yet. Please upload an image file (JPG, PNG, etc.)');
+async function convertPDFToImages(pdfBuffer: Buffer): Promise<Buffer[]> {
+  console.log('[OCR] Converting PDF to images...');
+  
+  const pdfjs = await getPdfJS();
+  const data = new Uint8Array(pdfBuffer);
+  const pdf = await pdfjs.getDocument({ data }).promise;
+  const images: Buffer[] = [];
+
+  console.log(`[OCR] PDF has ${pdf.numPages} page(s)`);
+
+  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
+    const page = await pdf.getPage(pageNum);
+    const viewport = page.getViewport({ scale: 2.0 });
+    
+    const canvas = createCanvas(viewport.width, viewport.height);
+    const context = canvas.getContext('2d');
+    
+    await page.render({
+      canvasContext: context as any,
+      viewport: viewport,
+    }).promise;
+    
+    const imageBuffer = canvas.toBuffer('image/png');
+    images.push(imageBuffer);
+    console.log(`[OCR] Converted page ${pageNum}/${pdf.numPages}`);
   }
 
-  if (!mimeType.startsWith('image/')) {
-    throw new Error('Only image files are supported (JPG, PNG, GIF, etc.)');
+  return images;
+}
+
+export async function processInvoiceOCR(fileBuffer: Buffer, mimeType: string): Promise<OCRResult> {
+  if (!mimeType.startsWith('image/') && mimeType !== 'application/pdf') {
+    throw new Error('Only image files (JPG, PNG, GIF) and PDF files are supported');
   }
 
   const worker = await getWorker();
-  
-  const { data: { text, confidence } } = await worker.recognize(fileBuffer);
-  
-  const parsedData = parseUtilityBillData(text);
+  let allText = '';
+  let totalConfidence = 0;
+  let pageCount = 0;
+
+  if (mimeType === 'application/pdf') {
+    const images = await convertPDFToImages(fileBuffer);
+    
+    for (let i = 0; i < images.length; i++) {
+      console.log(`[OCR] Processing page ${i + 1}/${images.length}...`);
+      const { data: { text, confidence } } = await worker.recognize(images[i]);
+      allText += text + '\n';
+      totalConfidence += confidence || 0;
+      pageCount++;
+    }
+  } else {
+    const { data: { text, confidence } } = await worker.recognize(fileBuffer);
+    allText = text;
+    totalConfidence = confidence || 0;
+    pageCount = 1;
+  }
+
+  const avgConfidence = totalConfidence / pageCount;
+  const parsedData = parseUtilityBillData(allText);
   
   return {
-    rawText: text.trim(),
+    rawText: allText.trim(),
     parsedData,
-    confidence: confidence || 0,
+    confidence: avgConfidence,
   };
 }
 
