@@ -122,6 +122,31 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Tenants
+  app.get("/api/tenants/current", isAuthenticated, withUser, async (req: any, res) => {
+    try {
+      const tenant = await storage.getTenant(req.tenantId);
+      if (!tenant) {
+        return res.status(404).json({ message: "Tenant not found" });
+      }
+      res.json(tenant);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.patch("/api/tenants/current", isAuthenticated, withUser, async (req: any, res) => {
+    try {
+      const tenant = await storage.updateTenant(req.tenantId, req.body);
+      if (!tenant) {
+        return res.status(404).json({ message: "Tenant not found" });
+      }
+      res.json(tenant);
+    } catch (error: any) {
+      res.status(400).json({ message: error.message });
+    }
+  });
+
   // Contacts
   app.get("/api/contacts", isAuthenticated, withUser, async (req: any, res) => {
     try {

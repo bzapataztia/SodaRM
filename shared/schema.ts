@@ -30,6 +30,7 @@ export const sessions = pgTable(
 export const tenants = pgTable("tenants", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   name: text("name").notNull(),
+  logo: text("logo"),
   plan: planEnum("plan").notNull().default("trial"),
   maxProperties: integer("max_properties").notNull().default(10),
   status: tenantStatusEnum("status").notNull().default("active"),

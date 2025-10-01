@@ -19,6 +19,7 @@ export interface IStorage {
   // Tenants
   getTenant(id: string): Promise<Tenant | undefined>;
   createTenant(tenant: InsertTenant): Promise<Tenant>;
+  updateTenant(id: string, tenant: Partial<InsertTenant>): Promise<Tenant | undefined>;
   updateTenantPlan(id: string, plan: string, maxProperties: number): Promise<void>;
   
   // Contacts
@@ -119,6 +120,14 @@ export class DatabaseStorage implements IStorage {
   async createTenant(tenant: InsertTenant): Promise<Tenant> {
     const [newTenant] = await db.insert(tenants).values(tenant).returning();
     return newTenant;
+  }
+
+  async updateTenant(id: string, tenant: Partial<InsertTenant>): Promise<Tenant | undefined> {
+    const [updated] = await db.update(tenants)
+      .set(tenant)
+      .where(eq(tenants.id, id))
+      .returning();
+    return updated;
   }
 
   async updateTenantPlan(id: string, plan: string, maxProperties: number): Promise<void> {

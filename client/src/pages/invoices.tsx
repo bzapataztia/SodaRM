@@ -165,7 +165,7 @@ function InvoiceFormDialog({
                   <FormItem>
                     <FormLabel>Número de Factura *</FormLabel>
                     <FormControl>
-                      <Input placeholder="INV-001" {...field} data-testid="input-number" />
+                      <Input placeholder="FAC-001" {...field} data-testid="input-number" />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

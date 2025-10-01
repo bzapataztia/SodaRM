@@ -1,15 +1,25 @@
-import { useMutation } from '@tanstack/react-query';
+import { useState } from 'react';
+import { useMutation, useQuery } from '@tanstack/react-query';
 import Sidebar from '@/components/layout/sidebar';
 import Topbar from '@/components/layout/topbar';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { api } from '@/lib/api';
 import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
-import { LogOut } from 'lucide-react';
+import { queryClient, apiRequest } from '@/lib/queryClient';
+import { LogOut, Upload, X, Building2 } from 'lucide-react';
 
 export default function SettingsPage() {
   const { tenant } = useAuth();
   const { toast } = useToast();
+  const [logoPreview, setLogoPreview] = useState<string | null>(null);
+  const [logoFile, setLogoFile] = useState<File | null>(null);
+
+  const { data: tenantData } = useQuery({
+    queryKey: ['/api/tenants/current'],
+  });
 
   const checkoutMutation = useMutation({
     mutationFn: (plan: string) => api.billing.createCheckout(plan),
@@ -40,6 +50,66 @@ export default function SettingsPage() {
       });
     },
   });
+
+  const updateTenantMutation = useMutation({
+    mutationFn: (data: { name?: string; logo?: string }) => 
+      apiRequest('PATCH', '/api/tenants/current', data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/tenants/current'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/auth/user'] });
+      toast({ title: 'Configuración actualizada exitosamente' });
+      setLogoFile(null);
+      setLogoPreview(null);
+    },
+    onError: () => {
+      toast({ title: 'Error al actualizar configuración', variant: 'destructive' });
+    },
+  });
+
+  const handleLogoChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.size > 2 * 1024 * 1024) {
+      toast({ 
+        title: 'Archivo muy grande', 
+        description: 'El logo debe ser menor a 2MB',
+        variant: 'destructive' 
+      });
+      return;
+    }
+
+    if (!file.type.startsWith('image/')) {
+      toast({ 
+        title: 'Formato no válido', 
+        description: 'Solo se permiten imágenes',
+        variant: 'destructive' 
+      });
+      return;
+    }
+
+    setLogoFile(file);
+    
+    const reader = new FileReader();
+    reader.onloadend = () => {
+      setLogoPreview(reader.result as string);
+    };
+    reader.readAsDataURL(file);
+  };
+
+  const handleRemoveLogo = () => {
+    setLogoFile(null);
+    setLogoPreview(null);
+  };
+
+  const handleSaveLogo = () => {
+    if (!logoPreview) return;
+    updateTenantMutation.mutate({ logo: logoPreview });
+  };
+
+  const handleRemoveCurrentLogo = () => {
+    updateTenantMutation.mutate({ logo: '' });
+  };
 
   const plans = [
     {
@@ -75,6 +145,74 @@ export default function SettingsPage() {
             <div className="mb-8">
               <h1 className="text-3xl font-bold tracking-tight">Configuración</h1>
               <p className="text-muted-foreground mt-1">Administra tu suscripción y configuración</p>
+            </div>
+
+            <div className="bg-card rounded-lg border border-border p-6 mb-8">
+              <div className="flex items-center gap-2 mb-4">
+                <Building2 className="h-5 w-5" />
+                <h2 className="text-lg font-semibold">Logo de la Empresa</h2>
+              </div>
+              
+              {(tenantData?.logo || logoPreview) && (
+                <div className="flex items-center gap-4 mb-4">
+                  <div className="relative">
+                    <img 
+                      src={logoPreview || tenantData?.logo} 
+                      alt="Logo" 
+                      className="h-24 w-24 object-contain rounded-lg border bg-white p-2"
+                      data-testid="img-logo-preview"
+                    />
+                    {logoPreview && (
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        className="absolute -top-2 -right-2 h-6 w-6 rounded-full"
+                        onClick={handleRemoveLogo}
+                        data-testid="button-remove-preview"
+                      >
+                        <X className="h-3 w-3" />
+                      </Button>
+                    )}
+                  </div>
+                  {tenantData?.logo && !logoPreview && (
+                    <Button
+                      variant="outline"
+                      onClick={handleRemoveCurrentLogo}
+                      disabled={updateTenantMutation.isPending}
+                      data-testid="button-remove-logo"
+                    >
+                      Eliminar Logo
+                    </Button>
+                  )}
+                </div>
+              )}
+
+              <div className="flex gap-4 items-end">
+                <div className="flex-1">
+                  <Label htmlFor="logo-upload" className="mb-2 block">Subir Logo</Label>
+                  <Input
+                    id="logo-upload"
+                    type="file"
+                    accept="image/*"
+                    onChange={handleLogoChange}
+                    className="cursor-pointer"
+                    data-testid="input-logo"
+                  />
+                  <p className="text-xs text-muted-foreground mt-1">
+                    PNG, JPG o GIF. Máximo 2MB.
+                  </p>
+                </div>
+                {logoPreview && (
+                  <Button
+                    onClick={handleSaveLogo}
+                    disabled={updateTenantMutation.isPending}
+                    data-testid="button-save-logo"
+                  >
+                    <Upload className="h-4 w-4 mr-2" />
+                    Guardar Logo
+                  </Button>
+                )}
+              </div>
             </div>
 
             <div className="bg-card rounded-lg border border-border p-6 mb-8">
