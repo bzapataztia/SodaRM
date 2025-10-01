@@ -32,6 +32,7 @@ Preferred communication style: Simple, everyday language.
   - AlertDialog: z-[150] (overlay), z-[200] (content) - appears above regular modals
   - Dropdowns/Selects/Popovers: z-[300] - always on top for proper interaction
 - **CSV Import/Export:** Added CSV import and export functionality for all modules (Contacts, Properties, Contracts, Invoices, Payments) with template download and comprehensive error handling.
+- **Company Branding:** Tenant logo now displays on the dashboard home page alongside the "Cartera Hoy" title. Logo can be uploaded via Settings page and appears automatically when set.
 
 ### Invoice Management Enhancements
 - **PDF Generation:** Implemented invoice PDF download functionality using pdfkit library. Endpoint `/api/invoices/:id/pdf` generates professional PDF documents with complete invoice details including tenant info, property details, charges breakdown, and totals.
