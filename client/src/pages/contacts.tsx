@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Form, FormControl, FormField, FormItem, FormLabel, FormMessage } from '@/components/ui/form';
 import { Input } from '@/components/ui/input';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { insertContactSchema, type Contact } from '@shared/schema';
@@ -202,9 +203,19 @@ function ContactFormDialog({
                 render={({ field }) => (
                   <FormItem>
                     <FormLabel>Tipo de Documento</FormLabel>
-                    <FormControl>
-                      <Input placeholder="DNI, CC, etc" {...field} data-testid="input-docType" />
-                    </FormControl>
+                    <Select onValueChange={field.onChange} value={field.value || ''}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-docType">
+                          <SelectValue placeholder="Seleccionar tipo" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="">Sin especificar</SelectItem>
+                        <SelectItem value="CC">CC - Cédula de Ciudadanía</SelectItem>
+                        <SelectItem value="CE">CE - Cédula de Extranjería</SelectItem>
+                        <SelectItem value="PP">PP - Pasaporte</SelectItem>
+                      </SelectContent>
+                    </Select>
                     <FormMessage />
                   </FormItem>
                 )}

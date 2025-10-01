@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { insertPropertySchema, type Property } from '@shared/schema';
+import { insertPropertySchema, type Property, type Contact } from '@shared/schema';
 import { z } from 'zod';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -47,6 +47,12 @@ function PropertyFormDialog({
 }) {
   const { toast } = useToast();
 
+  const { data: contacts = [] } = useQuery<Contact[]>({
+    queryKey: ['/api/contacts'],
+  });
+
+  const owners = contacts.filter(c => c.roles?.includes('owner'));
+
   const form = useForm<FormData>({
     resolver: zodResolver(formSchema),
     defaultValues: {
@@ -62,7 +68,16 @@ function PropertyFormDialog({
   });
 
   const createMutation = useMutation({
-    mutationFn: (data: FormData) => apiRequest('POST', '/api/properties', data),
+    mutationFn: (data: FormData) => {
+      const cleanData = {
+        ...data,
+        address: data.address || undefined,
+        type: data.type || undefined,
+        listRent: data.listRent || undefined,
+        ownerContactId: data.ownerContactId || undefined,
+      };
+      return apiRequest('POST', '/api/properties', cleanData);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
       toast({ title: 'Propiedad creada exitosamente' });
@@ -79,7 +94,16 @@ function PropertyFormDialog({
   });
 
   const updateMutation = useMutation({
-    mutationFn: (data: FormData) => apiRequest('PATCH', `/api/properties/${property?.id}`, data),
+    mutationFn: (data: FormData) => {
+      const cleanData = {
+        ...data,
+        address: data.address || undefined,
+        type: data.type || undefined,
+        listRent: data.listRent || undefined,
+        ownerContactId: data.ownerContactId || undefined,
+      };
+      return apiRequest('PATCH', `/api/properties/${property?.id}`, cleanData);
+    },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
       toast({ title: 'Propiedad actualizada exitosamente' });
@@ -209,19 +233,47 @@ function PropertyFormDialog({
               />
             </div>
 
-            <FormField
-              control={form.control}
-              name="listRent"
-              render={({ field }) => (
-                <FormItem>
-                  <FormLabel>Canon Mensual</FormLabel>
-                  <FormControl>
-                    <Input type="number" placeholder="0" {...field} data-testid="input-listRent" />
-                  </FormControl>
-                  <FormMessage />
-                </FormItem>
-              )}
-            />
+            <div className="grid grid-cols-2 gap-4">
+              <FormField
+                control={form.control}
+                name="listRent"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Canon Mensual</FormLabel>
+                    <FormControl>
+                      <Input type="number" placeholder="0" {...field} data-testid="input-listRent" />
+                    </FormControl>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+
+              <FormField
+                control={form.control}
+                name="ownerContactId"
+                render={({ field }) => (
+                  <FormItem>
+                    <FormLabel>Propietario</FormLabel>
+                    <Select onValueChange={field.onChange} value={field.value || ''}>
+                      <FormControl>
+                        <SelectTrigger data-testid="select-owner">
+                          <SelectValue placeholder="Seleccionar propietario" />
+                        </SelectTrigger>
+                      </FormControl>
+                      <SelectContent>
+                        <SelectItem value="">Sin propietario</SelectItem>
+                        {owners.map((owner) => (
+                          <SelectItem key={owner.id} value={owner.id}>
+                            {owner.fullName}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <FormMessage />
+                  </FormItem>
+                )}
+              />
+            </div>
 
             <div className="flex justify-end gap-3 pt-4">
               <Button
