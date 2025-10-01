@@ -1,5 +1,5 @@
 import { createWorker, type Worker } from 'tesseract.js';
-import { createCanvas } from 'canvas';
+import { createCanvas, Canvas } from 'canvas';
 import { db } from "../db";
 import { ocrLogs, invoiceCharges } from "@shared/schema";
 import { recalcInvoiceTotals } from "./invoiceEngine";
@@ -9,8 +9,30 @@ let pdfjsLib: any = null;
 async function getPdfJS() {
   if (!pdfjsLib) {
     pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
+    pdfjsLib.GlobalWorkerOptions.disableWorker = true;
   }
   return pdfjsLib;
+}
+
+class NodeCanvasFactory {
+  create(width: number, height: number) {
+    const canvas = createCanvas(width, height);
+    const context = canvas.getContext('2d');
+    return {
+      canvas,
+      context,
+    };
+  }
+
+  reset(canvasAndContext: any, width: number, height: number) {
+    canvasAndContext.canvas.width = width;
+    canvasAndContext.canvas.height = height;
+  }
+
+  destroy(canvasAndContext: any) {
+    canvasAndContext.canvas.width = 0;
+    canvasAndContext.canvas.height = 0;
+  }
 }
 
 interface OCRResult {
@@ -42,34 +64,48 @@ async function getWorker(): Promise<Worker> {
   return sharedWorker;
 }
 
-async function convertPDFToImages(pdfBuffer: Buffer): Promise<Buffer[]> {
-  console.log('[OCR] Converting PDF to images...');
+async function processPDFWithOCR(pdfBuffer: Buffer): Promise<{ text: string; confidence: number }> {
+  console.log('[OCR] Processing PDF...');
   
   const pdfjs = await getPdfJS();
   const data = new Uint8Array(pdfBuffer);
   const pdf = await pdfjs.getDocument({ data }).promise;
-  const images: Buffer[] = [];
+  const worker = await getWorker();
 
   console.log(`[OCR] PDF has ${pdf.numPages} page(s)`);
+
+  let allText = '';
+  let totalConfidence = 0;
+  const canvasFactory = new NodeCanvasFactory();
 
   for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
     const page = await pdf.getPage(pageNum);
     const viewport = page.getViewport({ scale: 2.0 });
     
-    const canvas = createCanvas(viewport.width, viewport.height);
-    const context = canvas.getContext('2d');
+    const canvasAndContext = canvasFactory.create(viewport.width, viewport.height);
     
     await page.render({
-      canvasContext: context as any,
+      canvasContext: canvasAndContext.context,
       viewport: viewport,
+      canvasFactory: canvasFactory as any,
     }).promise;
     
-    const imageBuffer = canvas.toBuffer('image/png');
-    images.push(imageBuffer);
-    console.log(`[OCR] Converted page ${pageNum}/${pdf.numPages}`);
+    const imageBuffer = (canvasAndContext.canvas as Canvas).toBuffer('image/png');
+    console.log(`[OCR] Converted page ${pageNum}/${pdf.numPages}, processing OCR...`);
+    
+    const { data: { text, confidence } } = await worker.recognize(imageBuffer);
+    allText += text + '\n';
+    totalConfidence += confidence || 0;
+    
+    canvasFactory.destroy(canvasAndContext);
   }
 
-  return images;
+  const avgConfidence = totalConfidence / pdf.numPages;
+  
+  return {
+    text: allText,
+    confidence: avgConfidence,
+  };
 }
 
 export async function processInvoiceOCR(fileBuffer: Buffer, mimeType: string): Promise<OCRResult> {
@@ -77,35 +113,26 @@ export async function processInvoiceOCR(fileBuffer: Buffer, mimeType: string): P
     throw new Error('Only image files (JPG, PNG, GIF) and PDF files are supported');
   }
 
-  const worker = await getWorker();
-  let allText = '';
-  let totalConfidence = 0;
-  let pageCount = 0;
+  let text: string;
+  let confidence: number;
 
   if (mimeType === 'application/pdf') {
-    const images = await convertPDFToImages(fileBuffer);
-    
-    for (let i = 0; i < images.length; i++) {
-      console.log(`[OCR] Processing page ${i + 1}/${images.length}...`);
-      const { data: { text, confidence } } = await worker.recognize(images[i]);
-      allText += text + '\n';
-      totalConfidence += confidence || 0;
-      pageCount++;
-    }
+    const result = await processPDFWithOCR(fileBuffer);
+    text = result.text;
+    confidence = result.confidence;
   } else {
-    const { data: { text, confidence } } = await worker.recognize(fileBuffer);
-    allText = text;
-    totalConfidence = confidence || 0;
-    pageCount = 1;
+    const worker = await getWorker();
+    const { data } = await worker.recognize(fileBuffer);
+    text = data.text;
+    confidence = data.confidence || 0;
   }
 
-  const avgConfidence = totalConfidence / pageCount;
-  const parsedData = parseUtilityBillData(allText);
+  const parsedData = parseUtilityBillData(text);
   
   return {
-    rawText: allText.trim(),
+    rawText: text.trim(),
     parsedData,
-    confidence: avgConfidence,
+    confidence,
   };
 }
 

@@ -697,7 +697,7 @@ export default function InvoicesPage() {
           <div className="space-y-4">
             <div>
               <p className="text-sm text-muted-foreground mb-4">
-                Sube una imagen de una factura de servicios (luz, agua, gas) para extraer automáticamente los datos.
+                Sube una imagen o PDF de una factura de servicios (luz, agua, gas) para extraer automáticamente los datos.
               </p>
               
               <Button
@@ -708,17 +708,17 @@ export default function InvoicesPage() {
                 className="w-full"
               >
                 <Upload className="w-4 h-4 mr-2" />
-                {ocrMutation.isPending ? 'Procesando...' : 'Seleccionar Imagen'}
+                {ocrMutation.isPending ? 'Procesando...' : 'Seleccionar Archivo'}
               </Button>
               <input
                 id="ocr-file-upload"
                 type="file"
-                accept="image/*"
+                accept="image/*,.pdf,application/pdf"
                 onChange={handleOCRFileSelect}
                 className="hidden"
               />
               <p className="text-xs text-muted-foreground mt-2">
-                Formatos soportados: JPG, PNG, GIF. Tamaño máximo: 10MB
+                Formatos soportados: JPG, PNG, GIF, PDF. Tamaño máximo: 10MB
               </p>
             </div>
 
