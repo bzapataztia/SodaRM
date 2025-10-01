@@ -2,20 +2,19 @@ import { db } from "./db";
 import { 
   users, tenants, contacts, properties, contracts, invoices, 
   invoiceCharges, payments, insurers, policies, ocrLogs, auditLogs,
-  type User, type InsertUser, type Tenant, type InsertTenant,
+  type User, type UpsertUser, type Tenant, type InsertTenant,
   type Contact, type InsertContact, type Property, type InsertProperty,
   type Contract, type InsertContract, type Invoice, type InsertInvoice,
   type Payment, type InsertPayment, type Insurer, type InsertInsurer,
   type Policy, type InsertPolicy
 } from "@shared/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
-import bcrypt from "bcryptjs";
 
 export interface IStorage {
-  // Users
+  // Users (Replit Auth)
+  getUser(id: string): Promise<User | undefined>;
+  upsertUser(user: UpsertUser): Promise<User>;
   getUserByEmail(email: string): Promise<User | undefined>;
-  createUser(user: InsertUser & { password: string }): Promise<User>;
-  verifyPassword(user: User, password: string): Promise<boolean>;
   
   // Tenants
   getTenant(id: string): Promise<Tenant | undefined>;
@@ -58,26 +57,31 @@ export interface IStorage {
 }
 
 export class DatabaseStorage implements IStorage {
+  async getUser(id: string): Promise<User | undefined> {
+    const [user] = await db.select().from(users).where(eq(users.id, id));
+    return user;
+  }
+
+  async upsertUser(userData: UpsertUser): Promise<User> {
+    const [user] = await db
+      .insert(users)
+      .values(userData)
+      .onConflictDoUpdate({
+        target: users.id,
+        set: {
+          ...userData,
+          updatedAt: new Date(),
+        },
+      })
+      .returning();
+    return user;
+  }
+
   async getUserByEmail(email: string): Promise<User | undefined> {
     const user = await db.query.users.findFirst({
       where: eq(users.email, email),
     });
     return user;
-  }
-
-  async createUser(insertUser: InsertUser & { password: string }): Promise<User> {
-    const hashedPassword = await bcrypt.hash(insertUser.password, 10);
-    
-    const [user] = await db.insert(users).values({
-      ...insertUser,
-      password: hashedPassword,
-    }).returning();
-    
-    return user;
-  }
-
-  async verifyPassword(user: User, password: string): Promise<boolean> {
-    return await bcrypt.compare(password, user.password);
   }
 
   async getTenant(id: string): Promise<Tenant | undefined> {

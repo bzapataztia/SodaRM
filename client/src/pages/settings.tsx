@@ -3,8 +3,9 @@ import Sidebar from '@/components/layout/sidebar';
 import Topbar from '@/components/layout/topbar';
 import { Button } from '@/components/ui/button';
 import { api } from '@/lib/api';
-import { useAuth } from '@/lib/auth';
+import { useAuth } from '@/hooks/useAuth';
 import { useToast } from '@/hooks/use-toast';
+import { LogOut } from 'lucide-react';
 
 export default function SettingsPage() {
   const { tenant } = useAuth();
@@ -132,6 +133,21 @@ export default function SettingsPage() {
                   </div>
                 ))}
               </div>
+            </div>
+
+            <div className="bg-card rounded-lg border border-border p-6 mt-8">
+              <h2 className="text-lg font-semibold mb-4">Cerrar sesión</h2>
+              <p className="text-sm text-muted-foreground mb-4">
+                Sal de tu cuenta actual de forma segura
+              </p>
+              <Button
+                variant="outline"
+                onClick={() => window.location.href = '/api/logout'}
+                data-testid="button-logout"
+              >
+                <LogOut className="w-4 h-4 mr-2" />
+                Cerrar sesión
+              </Button>
             </div>
           </div>
         </main>

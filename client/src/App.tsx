@@ -1,16 +1,13 @@
-import { Switch, Route, Redirect } from "wouter";
+import { Switch, Route } from "wouter";
 import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { AuthProvider, useAuth } from "./lib/auth";
-import ProtectedRoute from "./components/protected-route";
+import { useAuth } from "./hooks/useAuth";
 
-// Auth pages
-import LoginPage from "./pages/auth/login";
-import SignupPage from "./pages/auth/signup";
-
-// App pages
+// Pages
+import LandingPage from "./pages/landing";
+import OnboardingPage from "./pages/onboarding";
 import DashboardPage from "./pages/dashboard";
 import ContractsPage from "./pages/contracts";
 import InvoicesPage from "./pages/invoices";
@@ -24,7 +21,7 @@ import SettingsPage from "./pages/settings";
 import NotFound from "./pages/not-found";
 
 function AppRouter() {
-  const { token, isLoading } = useAuth();
+  const { isAuthenticated, isLoading, needsOnboarding } = useAuth();
 
   if (isLoading) {
     return (
@@ -34,66 +31,26 @@ function AppRouter() {
     );
   }
 
+  if (!isAuthenticated) {
+    return <LandingPage />;
+  }
+
+  if (needsOnboarding) {
+    return <OnboardingPage />;
+  }
+
   return (
     <Switch>
-      <Route path="/login">
-        {token ? <Redirect to="/" /> : <LoginPage />}
-      </Route>
-      <Route path="/signup">
-        {token ? <Redirect to="/" /> : <SignupPage />}
-      </Route>
-      
-      <Route path="/">
-        <ProtectedRoute>
-          <DashboardPage />
-        </ProtectedRoute>
-      </Route>
-      <Route path="/contracts">
-        <ProtectedRoute>
-          <ContractsPage />
-        </ProtectedRoute>
-      </Route>
-      <Route path="/invoices">
-        <ProtectedRoute>
-          <InvoicesPage />
-        </ProtectedRoute>
-      </Route>
-      <Route path="/invoices/:id">
-        <ProtectedRoute>
-          <InvoiceDetailPage />
-        </ProtectedRoute>
-      </Route>
-      <Route path="/payments">
-        <ProtectedRoute>
-          <PaymentsPage />
-        </ProtectedRoute>
-      </Route>
-      <Route path="/properties">
-        <ProtectedRoute>
-          <PropertiesPage />
-        </ProtectedRoute>
-      </Route>
-      <Route path="/contacts">
-        <ProtectedRoute>
-          <ContactsPage />
-        </ProtectedRoute>
-      </Route>
-      <Route path="/insurers">
-        <ProtectedRoute>
-          <InsurersPage />
-        </ProtectedRoute>
-      </Route>
-      <Route path="/ocr-inbox">
-        <ProtectedRoute>
-          <OCRInboxPage />
-        </ProtectedRoute>
-      </Route>
-      <Route path="/settings">
-        <ProtectedRoute>
-          <SettingsPage />
-        </ProtectedRoute>
-      </Route>
-      
+      <Route path="/" component={DashboardPage} />
+      <Route path="/contracts" component={ContractsPage} />
+      <Route path="/invoices" component={InvoicesPage} />
+      <Route path="/invoices/:id" component={InvoiceDetailPage} />
+      <Route path="/payments" component={PaymentsPage} />
+      <Route path="/properties" component={PropertiesPage} />
+      <Route path="/contacts" component={ContactsPage} />
+      <Route path="/insurers" component={InsurersPage} />
+      <Route path="/ocr-inbox" component={OCRInboxPage} />
+      <Route path="/settings" component={SettingsPage} />
       <Route component={NotFound} />
     </Switch>
   );
@@ -102,12 +59,10 @@ function AppRouter() {
 function App() {
   return (
     <QueryClientProvider client={queryClient}>
-      <AuthProvider>
-        <TooltipProvider>
-          <Toaster />
-          <AppRouter />
-        </TooltipProvider>
-      </AuthProvider>
+      <TooltipProvider>
+        <Toaster />
+        <AppRouter />
+      </TooltipProvider>
     </QueryClientProvider>
   );
 }
