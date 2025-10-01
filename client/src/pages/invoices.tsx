@@ -96,10 +96,12 @@ function InvoiceFormDialog({
     mutationFn: (data: FormData) => {
       const cleanData = {
         ...data,
-        tax: data.tax || '0',
-        otherCharges: data.otherCharges || '0',
-        lateFee: data.lateFee || '0',
-        amountPaid: data.amountPaid || '0',
+        subtotal: Math.abs(parseFloat(data.subtotal || '0')).toString(),
+        tax: Math.abs(parseFloat(data.tax || '0')).toString(),
+        otherCharges: Math.abs(parseFloat(data.otherCharges || '0')).toString(),
+        lateFee: Math.abs(parseFloat(data.lateFee || '0')).toString(),
+        totalAmount: Math.abs(parseFloat(data.totalAmount || '0')).toString(),
+        amountPaid: Math.abs(parseFloat(data.amountPaid || '0')).toString(),
       };
       return apiRequest('POST', '/api/invoices', cleanData);
     },
@@ -118,10 +120,12 @@ function InvoiceFormDialog({
     mutationFn: (data: FormData) => {
       const cleanData = {
         ...data,
-        tax: data.tax || '0',
-        otherCharges: data.otherCharges || '0',
-        lateFee: data.lateFee || '0',
-        amountPaid: data.amountPaid || '0',
+        subtotal: Math.abs(parseFloat(data.subtotal || '0')).toString(),
+        tax: Math.abs(parseFloat(data.tax || '0')).toString(),
+        otherCharges: Math.abs(parseFloat(data.otherCharges || '0')).toString(),
+        lateFee: Math.abs(parseFloat(data.lateFee || '0')).toString(),
+        totalAmount: Math.abs(parseFloat(data.totalAmount || '0')).toString(),
+        amountPaid: Math.abs(parseFloat(data.amountPaid || '0')).toString(),
       };
       return apiRequest('PATCH', `/api/invoices/${invoice?.id}`, cleanData);
     },

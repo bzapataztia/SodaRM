@@ -382,6 +382,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...req.body,
         tenantId: req.tenantId,
       });
+      
+      // Ensure all amounts are positive
+      if (parseFloat(invoiceData.subtotal) < 0 || 
+          parseFloat(invoiceData.tax || '0') < 0 || 
+          parseFloat(invoiceData.otherCharges || '0') < 0 || 
+          parseFloat(invoiceData.lateFee || '0') < 0 || 
+          parseFloat(invoiceData.totalAmount) < 0 || 
+          parseFloat(invoiceData.amountPaid || '0') < 0) {
+        return res.status(400).json({ message: "Invoice amounts cannot be negative" });
+      }
+      
       const invoice = await storage.createInvoice(invoiceData);
       res.json(invoice);
     } catch (error: any) {
@@ -391,6 +402,26 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/invoices/:id", isAuthenticated, withUser, async (req: any, res) => {
     try {
+      // Validate amounts if present
+      if (req.body.subtotal && parseFloat(req.body.subtotal) < 0) {
+        return res.status(400).json({ message: "Subtotal cannot be negative" });
+      }
+      if (req.body.tax && parseFloat(req.body.tax) < 0) {
+        return res.status(400).json({ message: "Tax cannot be negative" });
+      }
+      if (req.body.otherCharges && parseFloat(req.body.otherCharges) < 0) {
+        return res.status(400).json({ message: "Other charges cannot be negative" });
+      }
+      if (req.body.lateFee && parseFloat(req.body.lateFee) < 0) {
+        return res.status(400).json({ message: "Late fee cannot be negative" });
+      }
+      if (req.body.totalAmount && parseFloat(req.body.totalAmount) < 0) {
+        return res.status(400).json({ message: "Total amount cannot be negative" });
+      }
+      if (req.body.amountPaid && parseFloat(req.body.amountPaid) < 0) {
+        return res.status(400).json({ message: "Amount paid cannot be negative" });
+      }
+      
       const invoice = await storage.updateInvoice(req.params.id, req.tenantId, req.body);
       if (!invoice) {
         return res.status(404).json({ message: "Invoice not found" });
