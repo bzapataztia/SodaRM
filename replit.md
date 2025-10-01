@@ -12,6 +12,15 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes (October 2025)
 
+### OCR Implementation with Tesseract.js (October 1, 2025)
+- **OCR Service:** Implemented OCR processing using Tesseract.js for utility bill data extraction. Single shared worker instance reused across requests for optimal performance.
+- **Image-Only Support:** Current implementation accepts image files only (JPG, PNG, GIF). PDF support planned for future using PDF-to-image conversion.
+- **MIME Type Validation:** Backend validates file types and rejects unsupported formats with clear error messages surfaced to users.
+- **Invoice Integration:** Added "Subir Factura" button in Invoices page that opens OCR modal for uploading utility bills.
+- **Data Parsing:** Extracts provider name, total amount, period, consumption, and account numbers from Mexican utility providers (CFE, CCAPAMA, Naturgy).
+- **User Workflow:** Upload image → OCR processing → Display extracted data with confidence score → Preview raw text → Future: Approve and create charges.
+- **Error Handling:** Frontend displays backend error messages in toast notifications for better user feedback.
+
 ### Payment Validation (October 1, 2025)
 - **Overpayment Prevention:** Added backend validation to prevent payments that exceed invoice balance. System validates both new payments and updates to ensure total paid never exceeds invoice total.
 - **Balance Calculation:** Payment endpoints now check invoice balance before accepting payments, preventing data inconsistencies.
@@ -110,7 +119,7 @@ All tenant-scoped tables include a `tenantId` foreign key. Row-level isolation i
 - **Twilio WhatsApp (planned):** WhatsApp bot integration for payment status queries (not yet implemented in codebase).
 
 **Document Processing:**
-- **AWS Textract:** OCR processing for utility bills and service invoices. Extracts text, tables, and key-value pairs from PDF documents to automatically create invoice charges.
+- **Tesseract.js:** OCR processing for utility bills and service invoices using open-source Tesseract engine. Extracts text from image files (JPG, PNG, GIF) with Spanish language support. Single shared worker instance reused across requests for performance. PDF-to-image conversion planned for future expansion.
 
 **Cloud Storage:**
 - **S3-compatible storage:** For storing generated PDF reports and uploaded documents (referenced but not fully implemented in current codebase).
