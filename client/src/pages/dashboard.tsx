@@ -3,6 +3,7 @@ import Sidebar from '@/components/layout/sidebar';
 import Topbar from '@/components/layout/topbar';
 import KPICard from '@/components/kpi-card';
 import { api } from '@/lib/api';
+import type { Tenant } from '@shared/schema';
 
 export default function DashboardPage() {
   const { data: stats, isLoading } = useQuery({
@@ -11,6 +12,10 @@ export default function DashboardPage() {
 
   const { data: invoices } = useQuery({
     queryKey: ['/api/invoices'],
+  });
+
+  const { data: tenant } = useQuery<Tenant>({
+    queryKey: ['/api/tenants/current'],
   });
 
   const recentInvoices = invoices?.slice(0, 5) || [];
@@ -38,9 +43,19 @@ export default function DashboardPage() {
         <Topbar />
         <main className="flex-1 overflow-y-auto bg-background p-6">
           <div className="max-w-7xl mx-auto">
-            <div className="mb-8">
-              <h1 className="text-3xl font-bold tracking-tight">Cartera Hoy</h1>
-              <p className="text-muted-foreground mt-1">Vista general de tu cartera de arriendos</p>
+            <div className="mb-8 flex items-center gap-4">
+              {tenant?.logo && (
+                <img 
+                  src={tenant.logo} 
+                  alt={tenant.name || 'Logo'} 
+                  className="h-16 w-16 object-contain"
+                  data-testid="img-tenant-logo"
+                />
+              )}
+              <div>
+                <h1 className="text-3xl font-bold tracking-tight">Cartera Hoy</h1>
+                <p className="text-muted-foreground mt-1">Vista general de tu cartera de arriendos</p>
+              </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
