@@ -1,8 +1,16 @@
 import { createWorker, type Worker } from 'tesseract.js';
-import { createCanvas, Canvas, Image, ImageData } from 'canvas';
+import { createCanvas, Canvas, Image, ImageData as CanvasImageData } from 'canvas';
 import { db } from "../db";
 import { ocrLogs, invoiceCharges } from "@shared/schema";
 import { recalcInvoiceTotals } from "./invoiceEngine";
+
+if (typeof (global as any).ImageData === 'undefined') {
+  (global as any).ImageData = CanvasImageData;
+}
+
+if (typeof (global as any).Image === 'undefined') {
+  (global as any).Image = Image;
+}
 
 let pdfjsLib: any = null;
 
@@ -62,9 +70,6 @@ async function processPDFWithOCR(pdfBuffer: Buffer): Promise<{ text: string; con
     
     const canvas = createCanvas(viewport.width, viewport.height);
     const context = canvas.getContext('2d');
-    
-    (global as any).Image = Image;
-    (global as any).ImageData = ImageData;
     
     const renderContext = {
       canvasContext: context,
