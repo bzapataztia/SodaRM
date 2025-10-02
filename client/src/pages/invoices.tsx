@@ -811,7 +811,7 @@ export default function InvoicesPage() {
                       <SelectTrigger data-testid="select-contract">
                         <SelectValue placeholder="Selecciona un contrato" />
                       </SelectTrigger>
-                      <SelectContent>
+                      <SelectContent className="z-[300]">
                         {contracts.map((contract) => (
                           <SelectItem key={contract.id} value={contract.id}>
                             {contract.number}
