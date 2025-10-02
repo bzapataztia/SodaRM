@@ -1,5 +1,5 @@
 import { createWorker, type Worker } from 'tesseract.js';
-import { createCanvas, Canvas, Image } from 'canvas';
+import { createCanvas, Canvas, Image, ImageData } from 'canvas';
 import { db } from "../db";
 import { ocrLogs, invoiceCharges } from "@shared/schema";
 import { recalcInvoiceTotals } from "./invoiceEngine";
@@ -9,35 +9,9 @@ let pdfjsLib: any = null;
 async function getPdfJS() {
   if (!pdfjsLib) {
     pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
-    const canvas = await import('canvas');
-    
     pdfjsLib.GlobalWorkerOptions.disableWorker = true;
-    
-    global.Image = canvas.Image as any;
-    global.ImageData = canvas.ImageData as any;
   }
   return pdfjsLib;
-}
-
-class NodeCanvasFactory {
-  create(width: number, height: number) {
-    const canvas = createCanvas(width, height);
-    const context = canvas.getContext('2d');
-    return {
-      canvas,
-      context,
-    };
-  }
-
-  reset(canvasAndContext: any, width: number, height: number) {
-    canvasAndContext.canvas.width = width;
-    canvasAndContext.canvas.height = height;
-  }
-
-  destroy(canvasAndContext: any) {
-    canvasAndContext.canvas.width = 0;
-    canvasAndContext.canvas.height = 0;
-  }
 }
 
 interface OCRResult {
@@ -81,28 +55,30 @@ async function processPDFWithOCR(pdfBuffer: Buffer): Promise<{ text: string; con
 
   let allText = '';
   let totalConfidence = 0;
-  const canvasFactory = new NodeCanvasFactory();
 
   for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
     const page = await pdf.getPage(pageNum);
     const viewport = page.getViewport({ scale: 2.0 });
     
-    const canvasAndContext = canvasFactory.create(viewport.width, viewport.height);
+    const canvas = createCanvas(viewport.width, viewport.height);
+    const context = canvas.getContext('2d');
     
-    await page.render({
-      canvasContext: canvasAndContext.context,
+    (global as any).Image = Image;
+    (global as any).ImageData = ImageData;
+    
+    const renderContext = {
+      canvasContext: context,
       viewport: viewport,
-      canvasFactory: canvasFactory as any,
-    }).promise;
+    };
     
-    const imageBuffer = (canvasAndContext.canvas as Canvas).toBuffer('image/png');
+    await page.render(renderContext).promise;
+    
+    const imageBuffer = canvas.toBuffer('image/png');
     console.log(`[OCR] Converted page ${pageNum}/${pdf.numPages}, processing OCR...`);
     
     const { data: { text, confidence } } = await worker.recognize(imageBuffer);
     allText += text + '\n';
     totalConfidence += confidence || 0;
-    
-    canvasFactory.destroy(canvasAndContext);
   }
 
   const avgConfidence = totalConfidence / pdf.numPages;
