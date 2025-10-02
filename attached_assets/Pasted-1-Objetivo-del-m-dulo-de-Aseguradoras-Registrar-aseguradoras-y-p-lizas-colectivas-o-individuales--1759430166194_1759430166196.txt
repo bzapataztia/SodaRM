@@ -1,0 +1,284 @@
+1) Objetivo del módulo de Aseguradoras
+
+Registrar aseguradoras y pólizas (colectivas o individuales).
+
+Vincular contratos a pólizas vigentes.
+
+Hacer controles de compliance (no activar contrato sin póliza válida).
+
+Generar y enviar reporte mensual por aseguradora con cartera (emitido, cobrado, vencido) en PDF.
+
+2) Modelo de datos (DB)
+2.1. insurers
+Campo	Tipo	Notas
+id	uuid pk	
+tenant_id	uuid fk	multi-tenant
+name	text	único por tenant
+policy_type	enum(collective,individual)	dominante en la relación
+email_reports	text	destino del reporte mensual
+notes	text	opcional
+created_at	timestamptz	
+
+Índices: tenant_id, lower(name) único por tenant.
+
+2.2. policies
+Campo	Tipo	Notas
+id	uuid pk	
+tenant_id	uuid fk	
+policy_number	text	único por tenant
+insurer_id	uuid fk → insurers	
+coverage_type	text	(ej. “Arriendo residencial”)
+start_date	date	
+end_date	date	
+status	enum(active,expired)	derivado por fechas
+created_at	timestamptz	
+
+Índices: tenant_id, insurer_id, status, start_date,end_date.
+
+2.3. Relación con contracts
+
+Agregar a contracts:
+
+policy_id (uuid fk → policies, nullable)
+
+Regla: si el tenant exige póliza para activar, policy_id no puede ser NULL cuando status → active.
+
+3) Reglas de negocio
+
+Alta/Edición de Póliza
+
+start_date <= end_date
+
+status = active si today ∈ [start_date, end_date], si no expired.
+
+Una póliza colectiva puede asociarse a N contratos; una individual, típicamente 1 (validar por configuración).
+
+Activación de Contrato
+
+Si en Settings está require_policy_on_activation = true:
+
+Debe existir policy_id y policy.status = active.
+
+end_date de la póliza debe cubrir al menos contract.start_date (idealmente todo el plazo; si no, marcar warning y programar tarea de renovación).
+
+Si no cumple: bloquear activación con error legible.
+
+Monitoreo de pólizas
+
+Semanal: si una póliza que cubre un contrato vencerá en 30 o 15 días, crear task y enviar email interno.
+
+Reporte mensual por Aseguradora
+
+El día 1 (07:00) consolidar mes anterior: total emitido, cobrado, vencido; y detalle por contrato / inquilino.
+
+Generar PDF y enviar a insurers.email_reports. Guardar copia en S3.
+
+Baja/Expiración
+
+Si policy.status pasa a expired, los contratos asociados no se desactivan automáticamente; quedan con alerta de riesgo y tarea de regularización.
+
+4) Endpoints (API)
+
+Todas las rutas filtran por tenant_id a partir del JWT.
+
+Insurers
+
+POST /insurers
+Body: {name, policy_type, email_reports, notes}
+409 si name duplicado.
+
+GET /insurers?search=&page=&size=
+
+GET /insurers/{id}
+
+PATCH /insurers/{id}
+
+DELETE /insurers/{id} (soft delete opcional)
+
+Policies
+
+POST /policies
+Body: {policy_number, insurer_id, coverage_type, start_date, end_date}
+Settea status por fechas.
+
+GET /policies?insurer_id=&status=&expiring_in_days=&page=&size=
+
+GET /policies/{id}
+
+PATCH /policies/{id} (recalcular status si cambian fechas)
+
+DELETE /policies/{id} (solo si no hay contrato asociado o con force=true y registro en audit_logs)
+
+Contracts ↔ Policy
+
+PATCH /contracts/{id}/policy
+Body: {policy_id}
+Validar que policy.tenant_id == contract.tenant_id y policy.status='active'.
+Responder warning si policy.end_date < contract.end_date.
+
+Reporte mensual aseguradora
+
+POST /reports/insurer/{insurer_id}?period=YYYY-MM
+→ Genera y retorna PDF + dispara envío email.
+Seguridad: owner/admin.
+
+5) Jobs (scheduling)
+
+job_policies_status_sync (diario 02:00)
+
+Marca active/expired por fechas.
+
+job_policies_renewal_alerts (semanal lu 08:00)
+
+Pólizas con end_date = today+30|15
+
+Crear task para rol “Cobranzas/Legal” y enviar email interno.
+
+job_insurer_monthly_report (día 1, 07:00)
+
+Para cada insurer: calcular período prev_month y llamar pdf_reports.insurer_monthly_pdf + email_sender.send.
+
+6) Cálculo del reporte mensual (agregaciones)
+
+Input: insurer_id, period (YYYY-MM → period_start, period_end).
+Join: insurers → policies → contracts → invoices (por contract_id).
+Filtros: invoices.issue_date within month (o por due_date, definirlo).
+
+Métricas:
+
+Emitido: sum(invoice.total_amount) de facturas issued ese mes.
+
+Cobrado: sum(payments.amount) con payment_date within month.
+
+Vencido: sum(invoice.total_amount - invoice.amount_paid) para facturas con status in (overdue, partial) al cierre del mes.
+
+Detalle: por contrato / inquilino (nombre, email, teléfono), invoice.number, montos y días de mora si aplica.
+
+7) UI (mínimo)
+
+Insurers (lista/crear/editar)
+
+Campos: nombre, tipo, correo de reportes, notas.
+
+Acciones: “Generar reporte del mes” (picker YYYY-MM).
+
+Policies (lista/crear/editar)
+
+Badges por status y color por expiring soon.
+
+Filtro por aseguradora y por estado.
+
+Contrato → pestaña “Seguro”
+
+Mostrar póliza vinculada con chip status.
+
+Botón “Vincular/crear póliza”.
+
+Warning si end_date póliza < contract.end_date.
+
+Alertas
+
+Widget en dashboard: “Pólizas por vencer (30/15 días)”.
+
+8) Validaciones (backend)
+
+Crear/editar Policy
+
+start_date <= end_date
+
+policy_number único (tenant)
+
+Al guardar, recomputar status.
+
+Vincular Policy a Contract
+
+policy.status = active
+
+policy.tenant_id == contract.tenant_id
+
+Si require_policy_on_activation = true ⇒ bloquear contracts.activate() sin policy_id.
+
+Reporte mensual
+
+Si no hay email_reports ⇒ devolver 422 (configuración incompleta).
+
+9) Ejemplos (payloads)
+
+POST /insurers
+
+{
+  "name": "Aseguradora Andes",
+  "policy_type": "collective",
+  "email_reports": "reportes@andes.com",
+  "notes": "Póliza colectiva para arriendos residenciales"
+}
+
+
+POST /policies
+
+{
+  "policy_number": "POL-RES-2025-001",
+  "insurer_id": "2f1b8a3a-...-e9b2",
+  "coverage_type": "Arriendo residencial",
+  "start_date": "2025-01-01",
+  "end_date": "2025-12-31"
+}
+
+
+PATCH /contracts/{id}/policy
+
+{ "policy_id": "5f9d1c88-...-42aa" }
+
+
+POST /reports/insurer/{insurer_id}?period=2025-08
+
+{ "send_email": true }
+
+
+Respuesta (PDF)
+
+{
+  "pdf_url": "https://storage.s3/tenantX/insurer_reports/2025-08/andes.pdf",
+  "emitted_total": 125000000,
+  "paid_total": 93000000,
+  "overdue_total": 32000000,
+  "contracts_count": 148
+}
+
+10) Integraciones y permisos
+
+Email: usar plantilla InsurerMonthlyReport con adjunto PDF.
+
+Storage: guardar PDF en s3://{tenant}/insurer_reports/{period}/{insurer}.pdf.
+
+Auth: rutas bajo rol owner|admin; collections puede ver reportes pero no crear/editar pólizas salvo permiso.
+
+AuditLogs: registrar cambios de policy_id en contratos y envíos de reporte.
+
+11) Riesgos y decisiones
+
+Cobertura parcial: si la póliza no cubre todo el contrato, permitir activar con warning + tarea (decisión de negocio).
+
+Pólizas múltiples por contrato: MVP 1 por contrato; si se habilita N, usar tabla puente contract_policies (no requerido en piloto).
+
+Qué fecha usar para “emitido mes”: elegir issue_date (consistente con facturación), documentado en el reporte.
+
+12) Definición de Hecho (para aceptar la entrega)
+
+CRUD de Insurers y Policies con validaciones.
+
+PATCH /contracts/{id}/policy con reglas y warnings.
+
+Jobs: status_sync, renewal_alerts, insurer_monthly_report funcionando.
+
+PDF del reporte mensual con totales y detalle, enviado a email_reports y guardado en storage.
+
+UI operativa: Insurers, Policies, pestaña Seguro en Contrato, widget de alertas.
+
+Tests básicos:
+
+No permite activar contrato sin póliza cuando require_policy_on_activation=true.
+
+“Expiring 30/15” genera alertas.
+
+Reporte mensual agrega correctamente y adjunta PDF.
