@@ -36,6 +36,7 @@ export const tenants = pgTable("tenants", {
   status: tenantStatusEnum("status").notNull().default("active"),
   stripeCustomerId: text("stripe_customer_id"),
   stripeSubscriptionId: text("stripe_subscription_id"),
+  requirePolicyOnActivation: boolean("require_policy_on_activation").notNull().default(false),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
@@ -97,7 +98,6 @@ export const policies = pgTable("policies", {
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
   policyNumber: text("policy_number").notNull(),
   insurerId: varchar("insurer_id").notNull().references(() => insurers.id, { onDelete: "cascade" }),
-  contractId: varchar("contract_id"),
   coverageType: text("coverage_type"),
   startDate: date("start_date").notNull(),
   endDate: date("end_date").notNull(),
