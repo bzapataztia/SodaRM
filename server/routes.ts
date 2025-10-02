@@ -3,7 +3,7 @@ import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
 import { and, eq } from "drizzle-orm";
-import { invoices, insertTenantSchema, updateTenantLogoSchema, insertContactSchema, insertPropertySchema, insertContractSchema, insertInvoiceSchema, insertPaymentSchema, insertInsurerSchema, insertPolicySchema } from "@shared/schema";
+import { invoices, ocrLogs, insertTenantSchema, updateTenantLogoSchema, insertContactSchema, insertPropertySchema, insertContractSchema, insertInvoiceSchema, insertPaymentSchema, insertInsurerSchema, insertPolicySchema } from "@shared/schema";
 import { createMonthlyInvoices, recalcInvoiceTotals } from "./services/invoiceEngine";
 import { sendReminderD3, sendReminderD1 } from "./services/emailService";
 import { createCheckoutSession, handleWebhook, createCustomerPortalSession } from "./services/stripeService";
@@ -857,6 +857,77 @@ export async function registerRoutes(app: Express): Promise<Server> {
       const { invoiceId, description, amount } = req.body;
       await approveOCRAndCreateCharge(req.params.id, invoiceId, description, amount);
       res.json({ message: "OCR approved and charge created" });
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
+  app.post("/api/ocr/:id/create-invoice", isAuthenticated, withUser, async (req: any, res) => {
+    try {
+      const { contractId } = req.body;
+      const ocrLogId = req.params.id;
+
+      // Get OCR log to extract the amount
+      const ocrLog = await db.query.ocrLogs.findFirst({
+        where: (ocrLogs, { eq, and }) => and(
+          eq(ocrLogs.id, ocrLogId),
+          eq(ocrLogs.tenantId, req.tenantId)
+        ),
+      });
+
+      if (!ocrLog) {
+        return res.status(404).json({ message: "OCR log not found" });
+      }
+
+      if (!ocrLog.extractedAmount) {
+        return res.status(400).json({ message: "No amount extracted from OCR" });
+      }
+
+      // Get contract to extract tenant contact
+      const contract = await db.query.contracts.findFirst({
+        where: (contracts, { eq, and }) => and(
+          eq(contracts.id, contractId),
+          eq(contracts.tenantId, req.tenantId)
+        ),
+      });
+
+      if (!contract) {
+        return res.status(404).json({ message: "Contract not found" });
+      }
+
+      // Generate invoice number using contract number + OCR + timestamp
+      const timestamp = new Date().getTime().toString().slice(-6);
+      const invoiceNumber = `${contract.number}-OCR-${timestamp}`;
+
+      // Use today as issue date and +15 days as due date
+      const issueDate = new Date().toISOString().split('T')[0];
+      const dueDate = new Date(Date.now() + 15 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+
+      // Create invoice with OCR data
+      const invoiceData = {
+        tenantId: req.tenantId,
+        number: invoiceNumber,
+        contractId: contract.id,
+        tenantContactId: contract.tenantContactId,
+        issueDate,
+        dueDate,
+        subtotal: ocrLog.extractedAmount,
+        tax: "0",
+        otherCharges: "0",
+        lateFee: "0",
+        totalAmount: ocrLog.extractedAmount,
+        amountPaid: "0",
+        status: "issued" as const,
+      };
+
+      const invoice = await storage.createInvoice(invoiceData);
+
+      // Update OCR log status to ok
+      await db.update(ocrLogs)
+        .set({ status: 'ok', message: `Factura ${invoiceNumber} creada exitosamente` })
+        .where(eq(ocrLogs.id, ocrLogId));
+
+      res.json({ invoice, message: "Invoice created successfully" });
     } catch (error: any) {
       res.status(500).json({ message: error.message });
     }
