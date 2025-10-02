@@ -1,26 +1,8 @@
 import { createWorker, type Worker } from 'tesseract.js';
-import { createCanvas, Canvas, Image, ImageData as CanvasImageData } from 'canvas';
+import { pdf } from 'pdf-to-img';
 import { db } from "../db";
 import { ocrLogs, invoiceCharges } from "@shared/schema";
 import { recalcInvoiceTotals } from "./invoiceEngine";
-
-if (typeof (global as any).ImageData === 'undefined') {
-  (global as any).ImageData = CanvasImageData;
-}
-
-if (typeof (global as any).Image === 'undefined') {
-  (global as any).Image = Image;
-}
-
-let pdfjsLib: any = null;
-
-async function getPdfJS() {
-  if (!pdfjsLib) {
-    pdfjsLib = await import('pdfjs-dist/legacy/build/pdf.mjs');
-    pdfjsLib.GlobalWorkerOptions.disableWorker = true;
-  }
-  return pdfjsLib;
-}
 
 interface OCRResult {
   rawText: string;
@@ -52,41 +34,35 @@ async function getWorker(): Promise<Worker> {
 }
 
 async function processPDFWithOCR(pdfBuffer: Buffer): Promise<{ text: string; confidence: number }> {
-  console.log('[OCR] Processing PDF...');
+  console.log('[OCR] Processing PDF with pdf-to-img...');
   
-  const pdfjs = await getPdfJS();
-  const data = new Uint8Array(pdfBuffer);
-  const pdf = await pdfjs.getDocument({ data }).promise;
   const worker = await getWorker();
-
-  console.log(`[OCR] PDF has ${pdf.numPages} page(s)`);
+  const document = await pdf(pdfBuffer, { scale: 3 });
 
   let allText = '';
   let totalConfidence = 0;
+  let pageCount = 0;
 
-  for (let pageNum = 1; pageNum <= pdf.numPages; pageNum++) {
-    const page = await pdf.getPage(pageNum);
-    const viewport = page.getViewport({ scale: 2.0 });
+  for await (const page of document) {
+    pageCount++;
+    console.log(`[OCR] Processing page ${pageCount} with Tesseract...`);
     
-    const canvas = createCanvas(viewport.width, viewport.height);
-    const context = canvas.getContext('2d');
-    
-    const renderContext = {
-      canvasContext: context,
-      viewport: viewport,
-    };
-    
-    await page.render(renderContext).promise;
-    
-    const imageBuffer = canvas.toBuffer('image/png');
-    console.log(`[OCR] Converted page ${pageNum}/${pdf.numPages}, processing OCR...`);
+    let imageBuffer: Buffer;
+    if (Buffer.isBuffer(page)) {
+      imageBuffer = page;
+    } else if ((page as any).image && Buffer.isBuffer((page as any).image)) {
+      imageBuffer = (page as any).image;
+    } else {
+      throw new Error(`pdf-to-img returned invalid page data (expected Buffer, got ${typeof page})`);
+    }
     
     const { data: { text, confidence } } = await worker.recognize(imageBuffer);
     allText += text + '\n';
     totalConfidence += confidence || 0;
   }
 
-  const avgConfidence = totalConfidence / pdf.numPages;
+  const avgConfidence = pageCount > 0 ? totalConfidence / pageCount : 0;
+  console.log(`[OCR] Completed processing ${pageCount} page(s)`);
   
   return {
     text: allText,

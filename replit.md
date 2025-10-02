@@ -12,10 +12,10 @@ Preferred communication style: Simple, everyday language.
 
 ## Recent Changes (October 2025)
 
-### OCR Implementation with Tesseract.js (October 1, 2025)
+### OCR Implementation with Tesseract.js (October 1-2, 2025)
 - **OCR Service:** Implemented OCR processing using Tesseract.js for utility bill data extraction. Single shared worker instance reused across requests for optimal performance.
 - **File Format Support:** Accepts both image files (JPG, PNG, GIF) and PDF documents. Multi-page PDFs are processed sequentially with memory optimization.
-- **PDF Processing:** Uses pdfjs-dist with custom NodeCanvasFactory to convert PDF pages to images at 2.0 scale before OCR. Each page is processed individually to minimize memory usage.
+- **PDF Processing:** Uses pdf-to-img library (pure Node.js, no external dependencies) to convert PDF pages to high-quality images (scale: 3) before OCR. Replaced pdfjs-dist due to Node.js compatibility issues with inline images in PDFs.
 - **MIME Type Validation:** Backend validates file types and rejects unsupported formats with clear error messages surfaced to users.
 - **Invoice Integration:** Added "Subir Factura" button in Invoices page that opens OCR modal for uploading utility bills.
 - **Data Parsing:** Extracts provider name, total amount, period, consumption, and account numbers from Mexican utility providers (CFE, CCAPAMA, Naturgy).

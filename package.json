@@ -79,6 +79,7 @@
     "openid-client": "^6.8.1",
     "passport": "^0.7.0",
     "passport-local": "^1.0.0",
+    "pdf-to-img": "^5.0.0",
     "pdfjs-dist": "^5.4.149",
     "pdfkit": "^0.17.2",
     "react": "^18.3.1",
