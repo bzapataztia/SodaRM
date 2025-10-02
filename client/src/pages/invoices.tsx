@@ -398,12 +398,17 @@ export default function InvoicesPage() {
     queryKey: ['/api/invoices'],
   });
 
+  const { data: contracts = [] } = useQuery<Contract[]>({
+    queryKey: ['/api/contracts'],
+  });
+
   const [editingInvoice, setEditingInvoice] = useState<Invoice | undefined>();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [deleteInvoice, setDeleteInvoice] = useState<Invoice | undefined>();
   const [isOCRModalOpen, setIsOCRModalOpen] = useState(false);
   const [ocrFile, setOcrFile] = useState<File | null>(null);
   const [ocrResult, setOcrResult] = useState<any>(null);
+  const [selectedContractId, setSelectedContractId] = useState<string>('');
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiRequest('DELETE', `/api/invoices/${id}`),
@@ -469,6 +474,26 @@ export default function InvoicesPage() {
     onError: (error: Error) => {
       toast({ 
         title: 'Error al procesar OCR', 
+        description: error.message,
+        variant: 'destructive' 
+      });
+    },
+  });
+
+  const createInvoiceFromOCR = useMutation({
+    mutationFn: ({ ocrLogId, contractId }: { ocrLogId: string; contractId: string }) => 
+      apiRequest('POST', `/api/ocr/${ocrLogId}/create-invoice`, { contractId }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/invoices'] });
+      toast({ title: 'Factura creada exitosamente desde OCR' });
+      setIsOCRModalOpen(false);
+      setOcrResult(null);
+      setOcrFile(null);
+      setSelectedContractId('');
+    },
+    onError: (error: Error) => {
+      toast({ 
+        title: 'Error al crear factura', 
         description: error.message,
         variant: 'destructive' 
       });
@@ -779,29 +804,57 @@ export default function InvoicesPage() {
                   </div>
                 </div>
 
-                <div className="flex justify-end gap-2 pt-4">
-                  <Button
-                    variant="outline"
-                    onClick={() => {
-                      setIsOCRModalOpen(false);
-                      setOcrResult(null);
-                      setOcrFile(null);
-                    }}
-                    data-testid="button-cancel-ocr"
-                  >
-                    Cerrar
-                  </Button>
-                  <Button
-                    onClick={() => {
-                      toast({ 
-                        title: 'Funcionalidad en desarrollo',
-                        description: 'Próximamente podrás aprobar y crear cargos automáticamente desde aquí.'
-                      });
-                    }}
-                    data-testid="button-approve-ocr"
-                  >
-                    Aprobar y Crear Cargo
-                  </Button>
+                <div className="border-t pt-4 space-y-4">
+                  <div>
+                    <label className="text-sm font-semibold mb-2 block">Seleccionar Contrato</label>
+                    <Select value={selectedContractId} onValueChange={setSelectedContractId}>
+                      <SelectTrigger data-testid="select-contract">
+                        <SelectValue placeholder="Selecciona un contrato" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {contracts.map((contract) => (
+                          <SelectItem key={contract.id} value={contract.id}>
+                            {contract.number}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+
+                  <div className="flex justify-end gap-2">
+                    <Button
+                      variant="outline"
+                      onClick={() => {
+                        setIsOCRModalOpen(false);
+                        setOcrResult(null);
+                        setOcrFile(null);
+                        setSelectedContractId('');
+                      }}
+                      data-testid="button-cancel-ocr"
+                    >
+                      Cerrar
+                    </Button>
+                    <Button
+                      onClick={() => {
+                        if (!selectedContractId) {
+                          toast({ 
+                            title: 'Selecciona un contrato',
+                            description: 'Debes seleccionar un contrato para crear la factura.',
+                            variant: 'destructive'
+                          });
+                          return;
+                        }
+                        createInvoiceFromOCR.mutate({ 
+                          ocrLogId: ocrResult.id, 
+                          contractId: selectedContractId 
+                        });
+                      }}
+                      disabled={createInvoiceFromOCR.isPending || !selectedContractId}
+                      data-testid="button-create-invoice-ocr"
+                    >
+                      {createInvoiceFromOCR.isPending ? 'Creando...' : 'Crear Factura'}
+                    </Button>
+                  </div>
                 </div>
               </div>
             )}
