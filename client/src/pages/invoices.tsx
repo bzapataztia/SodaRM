@@ -754,42 +754,47 @@ export default function InvoicesPage() {
             )}
 
             {ocrResult && (
-              <div className="space-y-4 border rounded-lg p-4 bg-muted/50">
-                <div>
-                  <h3 className="font-semibold mb-2">Datos Extraídos</h3>
-                  <div className="grid grid-cols-2 gap-2 text-sm">
-                    {ocrResult.parsedData?.provider && (
-                      <div>
-                        <span className="text-muted-foreground">Proveedor:</span>
-                        <span className="ml-2 font-medium">{ocrResult.parsedData.provider}</span>
+              <div className="space-y-4">
+                <div className="border rounded-lg p-4 bg-muted/30">
+                  <h3 className="font-semibold mb-3 text-base">Datos Extraídos</h3>
+                  
+                  {ocrResult.parsedData?.total && (
+                    <div className="mb-4 p-3 bg-primary/10 rounded-md border border-primary/20">
+                      <div className="text-sm text-muted-foreground mb-1">Total</div>
+                      <div className="text-2xl font-bold text-primary">
+                        ${parseFloat(ocrResult.parsedData.total).toLocaleString('es-MX', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                       </div>
-                    )}
-                    {ocrResult.parsedData?.total && (
-                      <div>
-                        <span className="text-muted-foreground">Total:</span>
-                        <span className="ml-2 font-medium">${ocrResult.parsedData.total}</span>
+                    </div>
+                  )}
+
+                  <div className="grid grid-cols-2 gap-3 text-sm">
+                    {ocrResult.parsedData?.provider && (
+                      <div className="space-y-1">
+                        <div className="text-xs text-muted-foreground">Proveedor</div>
+                        <div className="font-medium">{ocrResult.parsedData.provider}</div>
                       </div>
                     )}
                     {ocrResult.parsedData?.period && (
-                      <div>
-                        <span className="text-muted-foreground">Período:</span>
-                        <span className="ml-2 font-medium">{ocrResult.parsedData.period}</span>
+                      <div className="space-y-1">
+                        <div className="text-xs text-muted-foreground">Período</div>
+                        <div className="font-medium">{ocrResult.parsedData.period}</div>
                       </div>
                     )}
                     {ocrResult.parsedData?.consumption && (
-                      <div>
-                        <span className="text-muted-foreground">Consumo:</span>
-                        <span className="ml-2 font-medium">{ocrResult.parsedData.consumption}</span>
+                      <div className="space-y-1">
+                        <div className="text-xs text-muted-foreground">Consumo</div>
+                        <div className="font-medium">{ocrResult.parsedData.consumption}</div>
                       </div>
                     )}
                     {ocrResult.parsedData?.accountNumber && (
-                      <div>
-                        <span className="text-muted-foreground">Cuenta:</span>
-                        <span className="ml-2 font-medium">{ocrResult.parsedData.accountNumber}</span>
+                      <div className="space-y-1">
+                        <div className="text-xs text-muted-foreground">Cuenta</div>
+                        <div className="font-medium">{ocrResult.parsedData.accountNumber}</div>
                       </div>
                     )}
                   </div>
-                  <div className="mt-3">
+
+                  <div className="mt-4 pt-3 border-t">
                     <span className="text-xs text-muted-foreground">
                       Confianza: {ocrResult.confidence > 70 ? '🟢 Alta' : ocrResult.confidence > 50 ? '🟡 Media' : '🔴 Baja'}
                       {' '}({Math.round(ocrResult.confidence)}%)
@@ -797,18 +802,18 @@ export default function InvoicesPage() {
                   </div>
                 </div>
 
-                <div className="border-t pt-4">
-                  <h4 className="text-sm font-semibold mb-2">Texto Completo</h4>
-                  <div className="max-h-40 overflow-y-auto bg-background rounded p-3 text-xs font-mono">
+                <div className="border rounded-lg p-4 bg-muted/30">
+                  <h4 className="text-sm font-semibold mb-3">Texto Completo</h4>
+                  <div className="max-h-32 overflow-y-auto bg-background rounded-md p-3 text-xs font-mono leading-relaxed">
                     {ocrResult.rawText}
                   </div>
                 </div>
 
-                <div className="border-t pt-4 space-y-4">
+                <div className="border rounded-lg p-4 bg-muted/30 space-y-4">
                   <div>
                     <label className="text-sm font-semibold mb-2 block">Seleccionar Contrato</label>
                     <Select value={selectedContractId} onValueChange={setSelectedContractId}>
-                      <SelectTrigger data-testid="select-contract">
+                      <SelectTrigger data-testid="select-contract" className="h-11">
                         <SelectValue placeholder="Selecciona un contrato" />
                       </SelectTrigger>
                       <SelectContent className="z-[300]">
@@ -821,7 +826,7 @@ export default function InvoicesPage() {
                     </Select>
                   </div>
 
-                  <div className="flex justify-end gap-2">
+                  <div className="flex justify-end gap-2 pt-2">
                     <Button
                       variant="outline"
                       onClick={() => {
@@ -851,6 +856,7 @@ export default function InvoicesPage() {
                       }}
                       disabled={createInvoiceFromOCR.isPending || !selectedContractId}
                       data-testid="button-create-invoice-ocr"
+                      className="min-w-[140px]"
                     >
                       {createInvoiceFromOCR.isPending ? 'Creando...' : 'Crear Factura'}
                     </Button>
