@@ -430,61 +430,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/contracts/:id/policy", isAuthenticated, withUser, async (req: any, res) => {
-    try {
-      const { id } = req.params;
-      const { policyId } = req.body;
-
-      // Get contract
-      const contract = await storage.getContract(id, req.tenantId);
-      if (!contract) {
-        return res.status(404).json({ message: "Contract not found" });
-      }
-
-      // If policyId is provided, validate it
-      if (policyId) {
-        const policy = await storage.getPolicy(policyId, req.tenantId);
-        if (!policy) {
-          return res.status(404).json({ message: "Policy not found" });
-        }
-
-        // Validate policy belongs to same tenant
-        if (policy.tenantId !== req.tenantId) {
-          return res.status(403).json({ message: "Policy does not belong to your organization" });
-        }
-
-        // Validate policy is active
-        if (policy.status !== 'active') {
-          return res.status(400).json({ message: "Policy must be active to link to contract" });
-        }
-
-        // Check if policy end date covers contract start date (warning if not full coverage)
-        const contractStartDate = new Date(contract.startDate);
-        const contractEndDate = new Date(contract.endDate);
-        const policyEndDate = new Date(policy.endDate);
-
-        const warning = policyEndDate < contractEndDate 
-          ? "La póliza vence antes que el contrato. Se recomienda renovar la póliza."
-          : null;
-
-        // Update contract with policy
-        await storage.updateContract(id, req.tenantId, { policyId });
-
-        return res.json({ 
-          message: "Póliza vinculada exitosamente", 
-          warning,
-          policy 
-        });
-      } else {
-        // Remove policy from contract
-        await storage.updateContract(id, req.tenantId, { policyId: null });
-        return res.json({ message: "Póliza desvinculada exitosamente" });
-      }
-    } catch (error: any) {
-      res.status(500).json({ message: error.message });
-    }
-  });
-
   app.post("/api/contracts/:id/activate", isAuthenticated, withUser, async (req: any, res) => {
     try {
       const { id } = req.params;
@@ -492,34 +437,6 @@ export async function registerRoutes(app: Express): Promise<Server> {
       
       if (!contract) {
         return res.status(404).json({ message: "Contract not found" });
-      }
-
-      // Check if tenant requires policy on activation
-      const tenant = await storage.getTenant(req.tenantId);
-      if (tenant?.requirePolicyOnActivation) {
-        // Validate contract has a policy
-        if (!contract.policyId) {
-          return res.status(400).json({ 
-            message: "No se puede activar el contrato sin una póliza vigente. Por favor vincule una póliza antes de activar." 
-          });
-        }
-
-        // Validate policy is active
-        const policy = await storage.getPolicy(contract.policyId, req.tenantId);
-        if (!policy || policy.status !== 'active') {
-          return res.status(400).json({ 
-            message: "La póliza vinculada no está activa. Por favor vincule una póliza activa antes de activar el contrato." 
-          });
-        }
-
-        // Check if policy covers contract start date
-        const policyEndDate = new Date(policy.endDate);
-        const contractStartDate = new Date(contract.startDate);
-        if (policyEndDate < contractStartDate) {
-          return res.status(400).json({ 
-            message: "La póliza vinculada ya venció antes de la fecha de inicio del contrato. Por favor vincule una póliza vigente." 
-          });
-        }
       }
 
       const invoices = await createMonthlyInvoices(id);

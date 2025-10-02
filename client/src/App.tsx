@@ -5,7 +5,13 @@ import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { useAuth } from "./hooks/useAuth";
 
--detail";
+// Pages
+import LandingPage from "./pages/landing";
+import OnboardingPage from "./pages/onboarding";
+import DashboardPage from "./pages/dashboard";
+import ContractsPage from "./pages/contracts";
+import InvoicesPage from "./pages/invoices";
+import InvoiceDetailPage from "./pages/invoice-detail";
 import PaymentsPage from "./pages/payments";
 import PropertiesPage from "./pages/properties";
 import ContactsPage from "./pages/contacts";
