@@ -206,7 +206,7 @@ function parseUtilityBillData(text: string): OCRResult['parsedData'] {
   for (const pattern of totalPatterns) {
     const match = text.match(pattern);
     if (match) {
-      data.total = match[1].replace(',', '');
+      data.total = match[1].replace(/,/g, '');
       break;
     }
   }
