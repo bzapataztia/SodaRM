@@ -16,6 +16,7 @@ export default function Sidebar() {
 
   const adminItems = [
     { path: '/insurers', icon: 'fa-shield-halved', label: 'Aseguradoras' },
+    { path: '/policies', icon: 'fa-file-shield', label: 'Pólizas' },
   ];
 
   const settingsItems = [

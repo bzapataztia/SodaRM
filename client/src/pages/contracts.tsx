@@ -9,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { insertContractSchema, type Contract, type Contact, type Property } from '@shared/schema';
+import { insertContractSchema, type Contract, type Contact, type Property, type Policy } from '@shared/schema';
 import { z } from 'zod';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
@@ -60,6 +60,10 @@ function ContractFormDialog({
 
   const { data: properties = [] } = useQuery<Property[]>({
     queryKey: ['/api/properties'],
+  });
+
+  const { data: policies = [] } = useQuery<Policy[]>({
+    queryKey: ['/api/policies'],
   });
 
   const form = useForm<FormData>({
@@ -248,6 +252,32 @@ function ContractFormDialog({
                 )}
               />
             </div>
+
+            <FormField
+              control={form.control}
+              name="policyId"
+              render={({ field }) => (
+                <FormItem>
+                  <FormLabel>Póliza de Seguro (Opcional)</FormLabel>
+                  <Select onValueChange={field.onChange} value={field.value}>
+                    <FormControl>
+                      <SelectTrigger data-testid="select-policy">
+                        <SelectValue placeholder="Seleccionar póliza" />
+                      </SelectTrigger>
+                    </FormControl>
+                    <SelectContent>
+                      <SelectItem value="">Sin póliza</SelectItem>
+                      {policies.map((policy) => (
+                        <SelectItem key={policy.id} value={policy.id}>
+                          {policy.policyNumber} - {policy.status === 'active' ? 'Activa' : 'Expirada'}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FormMessage />
+                </FormItem>
+              )}
+            />
 
             <div className="grid grid-cols-2 gap-4">
               <FormField

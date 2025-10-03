@@ -824,6 +824,17 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Policies with overdue invoices report
+  app.get("/api/insurers/:insurerId/overdue-policies-report", isAuthenticated, withUser, async (req: any, res) => {
+    try {
+      const { insurerId } = req.params;
+      const report = await storage.getPoliciesWithOverdueInvoices(insurerId, req.tenantId);
+      res.json(report);
+    } catch (error: any) {
+      res.status(500).json({ message: error.message });
+    }
+  });
+
   // OCR
   app.post("/api/ocr/process-invoice", isAuthenticated, withUser, upload.single('file'), async (req: any, res) => {
     try {

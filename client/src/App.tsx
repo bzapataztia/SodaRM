@@ -16,6 +16,7 @@ import PaymentsPage from "./pages/payments";
 import PropertiesPage from "./pages/properties";
 import ContactsPage from "./pages/contacts";
 import InsurersPage from "./pages/insurers";
+import PoliciesPage from "./pages/policies";
 import OCRInboxPage from "./pages/ocr-inbox";
 import SettingsPage from "./pages/settings";
 import NotFound from "./pages/not-found";
@@ -49,6 +50,7 @@ function AppRouter() {
       <Route path="/properties" component={PropertiesPage} />
       <Route path="/contacts" component={ContactsPage} />
       <Route path="/insurers" component={InsurersPage} />
+      <Route path="/policies" component={PoliciesPage} />
       <Route path="/ocr-inbox" component={OCRInboxPage} />
       <Route path="/settings" component={SettingsPage} />
       <Route component={NotFound} />

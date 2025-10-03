@@ -14,7 +14,7 @@ import { insertInsurerSchema, type Insurer } from '@shared/schema';
 import { z } from 'zod';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Pencil, Trash2 } from 'lucide-react';
+import { Plus, Pencil, Trash2, FileText } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -210,6 +210,15 @@ export default function InsurersPage() {
   const [editingInsurer, setEditingInsurer] = useState<Insurer | undefined>();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [deleteInsurer, setDeleteInsurer] = useState<Insurer | undefined>();
+  const [reportInsurer, setReportInsurer] = useState<Insurer | undefined>();
+
+  const { data: overdueReport = [], isLoading: isLoadingReport } = useQuery<any[]>({
+    queryKey: ['/api/insurers', reportInsurer?.id, 'overdue-policies-report'],
+    queryFn: () => reportInsurer 
+      ? fetch(`/api/insurers/${reportInsurer.id}/overdue-policies-report`).then(r => r.json())
+      : Promise.resolve([]),
+    enabled: !!reportInsurer,
+  });
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiRequest('DELETE', `/api/insurers/${id}`),
@@ -286,6 +295,15 @@ export default function InsurersPage() {
                               <Button 
                                 variant="ghost" 
                                 size="sm"
+                                onClick={() => setReportInsurer(insurer)}
+                                data-testid={`button-report-${insurer.id}`}
+                                title="Ver reporte de facturas vencidas"
+                              >
+                                <FileText className="w-4 h-4" />
+                              </Button>
+                              <Button 
+                                variant="ghost" 
+                                size="sm"
                                 onClick={() => setEditingInsurer(insurer)}
                                 data-testid={`button-edit-${insurer.id}`}
                               >
@@ -346,6 +364,66 @@ export default function InsurersPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      <Dialog open={!!reportInsurer} onOpenChange={(open) => !open && setReportInsurer(undefined)}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader>
+            <DialogTitle>
+              Reporte de Facturas Vencidas - {reportInsurer?.name}
+            </DialogTitle>
+          </DialogHeader>
+          <div className="mt-4">
+            {isLoadingReport ? (
+              <div className="flex items-center justify-center py-8">
+                <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
+              </div>
+            ) : overdueReport.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                No hay pólizas con facturas vencidas para esta aseguradora.
+              </div>
+            ) : (
+              <div className="bg-card rounded-lg border border-border overflow-hidden">
+                <div className="overflow-x-auto">
+                  <table className="w-full">
+                    <thead className="bg-muted">
+                      <tr>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Póliza</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Contrato</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Factura</th>
+                        <th className="px-4 py-3 text-left text-xs font-medium text-muted-foreground uppercase">Fecha Venc.</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">Total</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">Pagado</th>
+                        <th className="px-4 py-3 text-right text-xs font-medium text-muted-foreground uppercase">Pendiente</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {overdueReport.map((item: any, index: number) => {
+                        const pending = parseFloat(item.invoiceTotal) - parseFloat(item.invoiceAmountPaid);
+                        return (
+                          <tr key={index} className="hover:bg-muted/50" data-testid={`row-report-${index}`}>
+                            <td className="px-4 py-3 text-sm">
+                              <div>
+                                <div className="font-medium">{item.policyNumber}</div>
+                                <div className="text-xs text-muted-foreground">{item.coverageType || 'N/A'}</div>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-sm">{item.contractNumber}</td>
+                            <td className="px-4 py-3 text-sm">{item.invoiceNumber}</td>
+                            <td className="px-4 py-3 text-sm">{new Date(item.invoiceDueDate).toLocaleDateString('es-ES')}</td>
+                            <td className="px-4 py-3 text-sm text-right">${parseFloat(item.invoiceTotal).toFixed(2)}</td>
+                            <td className="px-4 py-3 text-sm text-right">${parseFloat(item.invoiceAmountPaid).toFixed(2)}</td>
+                            <td className="px-4 py-3 text-sm text-right font-medium text-red-600">${pending.toFixed(2)}</td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            )}
+          </div>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

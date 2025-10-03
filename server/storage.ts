@@ -72,6 +72,7 @@ export interface IStorage {
   createPolicy(policy: InsertPolicy): Promise<Policy>;
   updatePolicy(id: string, tenantId: string, policy: Partial<InsertPolicy>): Promise<Policy | undefined>;
   deletePolicy(id: string, tenantId: string): Promise<void>;
+  getPoliciesWithOverdueInvoices(insurerId: string, tenantId: string): Promise<any[]>;
   
   // OCR
   getOCRLogs(tenantId: string, status?: string): Promise<any[]>;
@@ -538,6 +539,37 @@ export class DatabaseStorage implements IStorage {
   async deletePolicy(id: string, tenantId: string): Promise<void> {
     await db.delete(policies)
       .where(and(eq(policies.id, id), eq(policies.tenantId, tenantId)));
+  }
+
+  async getPoliciesWithOverdueInvoices(insurerId: string, tenantId: string): Promise<any[]> {
+    const result = await db
+      .select({
+        policyId: policies.id,
+        policyNumber: policies.policyNumber,
+        coverageType: policies.coverageType,
+        policyStatus: policies.status,
+        contractId: contracts.id,
+        contractNumber: contracts.number,
+        invoiceId: invoices.id,
+        invoiceNumber: invoices.number,
+        invoiceDueDate: invoices.dueDate,
+        invoiceTotal: invoices.totalAmount,
+        invoiceAmountPaid: invoices.amountPaid,
+        tenantContactId: contracts.tenantContactId,
+      })
+      .from(policies)
+      .innerJoin(contracts, eq(contracts.policyId, policies.id))
+      .innerJoin(invoices, eq(invoices.contractId, contracts.id))
+      .where(
+        and(
+          eq(policies.insurerId, insurerId),
+          eq(policies.tenantId, tenantId),
+          eq(invoices.status, 'overdue')
+        )
+      )
+      .orderBy(desc(invoices.dueDate));
+
+    return result;
   }
 }
 
