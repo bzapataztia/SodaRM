@@ -37,28 +37,32 @@ export default function DashboardPage() {
   };
 
   return (
-    <div className="flex h-screen overflow-hidden">
+    <div className="flex h-screen overflow-hidden bg-background">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Topbar />
-        <main className="flex-1 overflow-y-auto bg-background p-6">
-          <div className="max-w-7xl mx-auto">
-            <div className="mb-8 flex items-center gap-4">
+        <main className="flex-1 overflow-y-auto custom-scrollbar p-8">
+          <div className="max-w-7xl mx-auto space-y-8">
+            <div className="flex items-center gap-5">
               {tenant?.logo && (
-                <img 
-                  src={tenant.logo} 
-                  alt={tenant.name || 'Logo'} 
-                  className="h-16 w-16 object-contain"
-                  data-testid="img-tenant-logo"
-                />
+                <div className="flex-shrink-0">
+                  <img 
+                    src={tenant.logo} 
+                    alt={tenant.name || 'Logo'} 
+                    className="h-20 w-20 object-contain rounded-xl border-2 border-border shadow-sm"
+                    data-testid="img-tenant-logo"
+                  />
+                </div>
               )}
               <div>
-                <h1 className="text-3xl font-bold tracking-tight">Cartera Hoy</h1>
-                <p className="text-muted-foreground mt-1">Vista general de tu cartera de arriendos</p>
+                <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
+                  Cartera Hoy
+                </h1>
+                <p className="text-muted-foreground mt-2 text-base">Vista general de tu cartera de arriendos</p>
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
               <KPICard
                 title="Emitido Este Mes"
                 value={formatCurrency(stats?.issued || 0)}
@@ -87,71 +91,83 @@ export default function DashboardPage() {
               />
             </div>
 
-            <div className="bg-card rounded-lg border border-border overflow-hidden">
-              <div className="p-6 border-b border-border">
-                <h2 className="text-lg font-semibold">Facturas Recientes</h2>
-                <p className="text-sm text-muted-foreground mt-1">Últimas facturas emitidas</p>
+            <div className="bg-card rounded-2xl border border-border overflow-hidden shadow-sm">
+              <div className="px-6 py-5 border-b border-border bg-gradient-to-r from-background to-muted/30">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-xl font-bold text-foreground">Facturas Recientes</h2>
+                    <p className="text-sm text-muted-foreground mt-1">Últimas facturas emitidas en el sistema</p>
+                  </div>
+                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
+                    <i className="fas fa-file-invoice text-primary"></i>
+                  </div>
+                </div>
               </div>
 
               <div className="overflow-x-auto">
                 <table className="w-full">
-                  <thead className="bg-muted">
-                    <tr>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                  <thead>
+                    <tr className="bg-muted/50">
+                      <th className="px-6 py-4 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">
                         Número
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      <th className="px-6 py-4 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">
                         Inquilino
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      <th className="px-6 py-4 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">
                         Total
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      <th className="px-6 py-4 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">
                         Estado
                       </th>
-                      <th className="px-6 py-3 text-left text-xs font-medium text-muted-foreground uppercase tracking-wider">
+                      <th className="px-6 py-4 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">
                         Acciones
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border">
+                  <tbody className="divide-y divide-border bg-card">
                     {recentInvoices.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="px-6 py-8 text-center text-muted-foreground">
-                          No hay facturas registradas
+                        <td colSpan={5} className="px-6 py-12 text-center">
+                          <div className="flex flex-col items-center gap-3">
+                            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
+                              <i className="fas fa-inbox text-2xl text-muted-foreground"></i>
+                            </div>
+                            <p className="text-muted-foreground font-medium">No hay facturas registradas</p>
+                          </div>
                         </td>
                       </tr>
                     ) : (
                       recentInvoices.map((invoice: any) => (
-                        <tr key={invoice.id} className="hover:bg-muted/50">
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="text-sm font-medium font-mono">{invoice.number}</span>
+                        <tr key={invoice.id} className="hover:bg-muted/30 transition-colors">
+                          <td className="px-6 py-5 whitespace-nowrap">
+                            <span className="text-sm font-bold font-mono text-foreground">{invoice.number}</span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="text-sm">{invoice.tenantContact?.fullName}</span>
+                          <td className="px-6 py-5 whitespace-nowrap">
+                            <span className="text-sm font-medium text-foreground">{invoice.tenantContact?.fullName}</span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="text-sm font-semibold font-mono">
+                          <td className="px-6 py-5 whitespace-nowrap">
+                            <span className="text-sm font-bold font-mono text-foreground">
                               {formatCurrency(parseFloat(invoice.totalAmount))}
                             </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td className="px-6 py-5 whitespace-nowrap">
                             <span
-                              className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                              className={`inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-bold ${
                                 invoice.status === 'paid'
-                                  ? 'bg-success/10 text-success'
+                                  ? 'bg-success/15 text-success border border-success/20'
                                   : invoice.status === 'overdue'
-                                  ? 'bg-destructive/10 text-destructive'
-                                  : 'bg-warning/10 text-warning'
+                                  ? 'bg-destructive/15 text-destructive border border-destructive/20'
+                                  : 'bg-warning/15 text-warning border border-warning/20'
                               }`}
                             >
                               {invoice.status === 'paid' ? 'Pagada' : invoice.status === 'overdue' ? 'Vencida' : 'Emitida'}
                             </span>
                           </td>
-                          <td className="px-6 py-4 whitespace-nowrap">
+                          <td className="px-6 py-5 whitespace-nowrap">
                             <a
                               href={`/invoices/${invoice.id}`}
-                              className="text-primary hover:text-primary/80"
+                              className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-primary/10 text-primary hover:bg-primary hover:text-white transition-all"
                               data-testid={`link-invoice-${invoice.id}`}
                             >
                               <i className="fas fa-eye"></i>
