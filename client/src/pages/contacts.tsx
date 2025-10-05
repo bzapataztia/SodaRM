@@ -13,7 +13,7 @@ import { insertContactSchema, type Contact } from '@shared/schema';
 import { z } from 'zod';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Pencil, Trash2, Upload, Download } from 'lucide-react';
+import { Plus, Pencil, Trash2, Upload, Download, X } from 'lucide-react';
 import { Checkbox } from '@/components/ui/checkbox';
 import {
   AlertDialog,
@@ -102,12 +102,22 @@ function ContactFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{contact ? 'Editar Contacto' : 'Nuevo Contacto'}</DialogTitle>
+      <DialogContent className="sm:max-w-[600px] max-h-[90vh] overflow-y-auto p-0">
+        <DialogHeader className="px-6 py-4 border-b border-gray-100">
+          <div className="flex items-center justify-between">
+            <DialogTitle className="text-lg">{contact ? 'Editar Contacto' : 'Nuevo Contacto'}</DialogTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onOpenChange(false)}
+              className="h-6 w-6 p-0 rounded-full hover:bg-gray-100"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="px-6 py-6 space-y-5">
             <FormField
               control={form.control}
               name="fullName"
@@ -235,7 +245,7 @@ function ContactFormDialog({
               />
             </div>
 
-            <div className="flex justify-end gap-3 pt-4">
+            <div className="flex justify-end space-x-3 pt-4">
               <Button
                 type="button"
                 variant="outline"

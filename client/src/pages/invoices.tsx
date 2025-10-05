@@ -14,7 +14,7 @@ import { insertInvoiceSchema, type Invoice, type Contract, type Contact } from '
 import { z } from 'zod';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Pencil, Trash2, Eye, Download, Upload, FileText } from 'lucide-react';
+import { Plus, Pencil, Trash2, Eye, Download, Upload, FileText, X } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -151,12 +151,22 @@ function InvoiceFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{invoice ? 'Editar Factura' : 'Nueva Factura'}</DialogTitle>
+      <DialogContent className="sm:max-w-[750px] max-h-[90vh] overflow-y-auto p-0">
+        <DialogHeader className="px-6 py-4 border-b border-gray-100">
+          <div className="flex items-center justify-between">
+            <DialogTitle className="text-lg">{invoice ? 'Editar Factura' : 'Nueva Factura'}</DialogTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onOpenChange(false)}
+              className="h-6 w-6 p-0 rounded-full hover:bg-gray-100"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="px-6 py-6 space-y-5">
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -368,7 +378,7 @@ function InvoiceFormDialog({
               />
             </div>
 
-            <div className="flex justify-end gap-3 pt-4">
+            <div className="flex justify-end space-x-3 pt-4">
               <Button
                 type="button"
                 variant="outline"
@@ -715,11 +725,21 @@ export default function InvoicesPage() {
       </AlertDialog>
 
       <Dialog open={isOCRModalOpen} onOpenChange={setIsOCRModalOpen}>
-        <DialogContent className="max-w-2xl">
-          <DialogHeader>
-            <DialogTitle>Procesar Factura con OCR</DialogTitle>
+        <DialogContent className="sm:max-w-[600px] p-0">
+          <DialogHeader className="px-6 py-4 border-b border-gray-100">
+            <div className="flex items-center justify-between">
+              <DialogTitle className="text-lg">Procesar Factura con OCR</DialogTitle>
+              <Button
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsOCRModalOpen(false)}
+                className="h-6 w-6 p-0 rounded-full hover:bg-gray-100"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            </div>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="px-6 py-6 space-y-5">
             <div>
               <p className="text-sm text-muted-foreground mb-4">
                 Sube una imagen o PDF de una factura de servicios (luz, agua, gas) para extraer automáticamente los datos.
@@ -826,7 +846,7 @@ export default function InvoicesPage() {
                     </Select>
                   </div>
 
-                  <div className="flex justify-end gap-2 pt-2">
+                  <div className="flex justify-end space-x-3 pt-4">
                     <Button
                       variant="outline"
                       onClick={() => {

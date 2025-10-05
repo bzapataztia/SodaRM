@@ -13,7 +13,7 @@ import { insertContractSchema, type Contract, type Contact, type Property, type 
 import { z } from 'zod';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Pencil, Trash2, Play, Download, Upload } from 'lucide-react';
+import { Plus, Pencil, Trash2, Play, Download, Upload, X } from 'lucide-react';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -128,12 +128,22 @@ function ContractFormDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>{contract ? 'Editar Contrato' : 'Nuevo Contrato'}</DialogTitle>
+      <DialogContent className="sm:max-w-[750px] max-h-[90vh] overflow-y-auto p-0">
+        <DialogHeader className="px-6 py-4 border-b border-gray-100">
+          <div className="flex items-center justify-between">
+            <DialogTitle className="text-lg">{contract ? 'Editar Contrato' : 'Nuevo Contrato'}</DialogTitle>
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={() => onOpenChange(false)}
+              className="h-6 w-6 p-0 rounded-full hover:bg-gray-100"
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </DialogHeader>
         <Form {...form}>
-          <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4">
+          <form onSubmit={form.handleSubmit(onSubmit)} className="px-6 py-6 space-y-5">
             <div className="grid grid-cols-2 gap-4">
               <FormField
                 control={form.control}
@@ -384,7 +394,7 @@ function ContractFormDialog({
               />
             </div>
 
-            <div className="flex justify-end gap-3 pt-4">
+            <div className="flex justify-end space-x-3 pt-4">
               <Button
                 type="button"
                 variant="outline"
