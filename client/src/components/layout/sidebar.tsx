@@ -91,16 +91,16 @@ export default function Sidebar() {
                   onClick={handleLinkClick}
                   className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all cursor-pointer ${
                     isActive
-                      ? 'bg-primary'
-                      : 'hover:bg-muted'
+                      ? 'bg-primary/10 border-l-4 border-primary'
+                      : 'hover:bg-muted border-l-4 border-transparent'
                   }`}
                   data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
                 >
-                  <i className={`fas ${item.icon} text-base w-5 ${isActive ? 'text-white' : 'text-foreground'}`}></i>
-                  <span className={`text-sm font-medium flex-1 ${isActive ? 'text-white' : 'text-foreground'}`}>{item.label}</span>
+                  <i className={`fas ${item.icon} text-base w-5 ${isActive ? 'text-primary' : 'text-foreground'}`}></i>
+                  <span className={`text-sm font-medium flex-1 ${isActive ? 'text-primary font-semibold' : 'text-foreground'}`}>{item.label}</span>
                   {item.badge !== undefined && (
                     <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                      isActive ? 'bg-white/20 text-white' : 'bg-primary/10 text-primary'
+                      isActive ? 'bg-primary text-white' : 'bg-primary/10 text-primary'
                     }`}>
                       {item.badge}
                     </span>
@@ -122,13 +122,13 @@ export default function Sidebar() {
                     onClick={handleLinkClick}
                     className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all cursor-pointer ${
                       isActive
-                        ? 'bg-primary'
-                        : 'hover:bg-muted'
+                        ? 'bg-primary/10 border-l-4 border-primary'
+                        : 'hover:bg-muted border-l-4 border-transparent'
                     }`}
                     data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
                   >
-                    <i className={`fas ${item.icon} text-base w-5 ${isActive ? 'text-white' : 'text-foreground'}`}></i>
-                    <span className={`text-sm font-medium flex-1 ${isActive ? 'text-white' : 'text-foreground'}`}>{item.label}</span>
+                    <i className={`fas ${item.icon} text-base w-5 ${isActive ? 'text-primary' : 'text-foreground'}`}></i>
+                    <span className={`text-sm font-medium flex-1 ${isActive ? 'text-primary font-semibold' : 'text-foreground'}`}>{item.label}</span>
                   </div>
                 </Link>
               );
@@ -147,13 +147,13 @@ export default function Sidebar() {
                     onClick={handleLinkClick}
                     className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all cursor-pointer ${
                       isActive
-                        ? 'bg-primary'
-                        : 'hover:bg-muted'
+                        ? 'bg-primary/10 border-l-4 border-primary'
+                        : 'hover:bg-muted border-l-4 border-transparent'
                     }`}
                     data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
                   >
-                    <i className={`fas ${item.icon} text-base w-5 ${isActive ? 'text-white' : 'text-foreground'}`}></i>
-                    <span className={`text-sm font-medium ${isActive ? 'text-white' : 'text-foreground'}`}>{item.label}</span>
+                    <i className={`fas ${item.icon} text-base w-5 ${isActive ? 'text-primary' : 'text-foreground'}`}></i>
+                    <span className={`text-sm font-medium ${isActive ? 'text-primary font-semibold' : 'text-foreground'}`}>{item.label}</span>
                   </div>
                 </Link>
               );
