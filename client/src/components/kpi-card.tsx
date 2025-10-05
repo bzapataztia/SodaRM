@@ -46,7 +46,7 @@ export default function KPICard({ title, value, icon, trend, subtitle, variant =
 
   return (
     <div className={`relative bg-card rounded-xl border ${styles.border} p-6 hover:shadow-xl transition-all duration-300 hover:-translate-y-1 overflow-hidden ${styles.bgLight}`}>
-      <div className="absolute top-0 right-0 w-32 h-32 ${styles.gradient} opacity-5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2" />
+      <div className={`absolute top-0 right-0 w-32 h-32 ${styles.gradient} opacity-5 rounded-full blur-3xl -translate-y-1/2 translate-x-1/2`} />
       
       <div className="relative z-10">
         <div className="flex items-start justify-between mb-4">
