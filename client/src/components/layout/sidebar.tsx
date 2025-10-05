@@ -45,8 +45,8 @@ export default function Sidebar() {
         <div className="space-y-1.5">
           {navItems.map((item) => (
             <Link key={item.path} href={item.path}>
-              <a
-                className={`group flex items-center gap-3 px-3.5 py-3 rounded-xl transition-all ${
+              <div
+                className={`group flex items-center gap-3 px-3.5 py-3 rounded-xl transition-all cursor-pointer ${
                   location === item.path
                     ? 'gradient-primary text-white font-medium shadow-md'
                     : 'text-foreground hover:bg-muted hover:translate-x-1'
@@ -59,7 +59,7 @@ export default function Sidebar() {
                   <i className={`fas ${item.icon} text-base ${location === item.path ? 'text-white' : 'text-primary'}`}></i>
                 </div>
                 <span className="text-sm font-medium">{item.label}</span>
-              </a>
+              </div>
             </Link>
           ))}
         </div>
@@ -69,8 +69,8 @@ export default function Sidebar() {
           <div className="space-y-1.5">
             {adminItems.map((item) => (
               <Link key={item.path} href={item.path}>
-                <a
-                  className={`group flex items-center gap-3 px-3.5 py-3 rounded-xl transition-all ${
+                <div
+                  className={`group flex items-center gap-3 px-3.5 py-3 rounded-xl transition-all cursor-pointer ${
                     location === item.path
                       ? 'gradient-primary text-white font-medium shadow-md'
                       : 'text-foreground hover:bg-muted hover:translate-x-1'
@@ -83,7 +83,7 @@ export default function Sidebar() {
                     <i className={`fas ${item.icon} text-base ${location === item.path ? 'text-white' : 'text-primary'}`}></i>
                   </div>
                   <span className="text-sm font-medium">{item.label}</span>
-                </a>
+                </div>
               </Link>
             ))}
           </div>
@@ -94,8 +94,8 @@ export default function Sidebar() {
           <div className="space-y-1.5">
             {settingsItems.map((item) => (
               <Link key={item.path} href={item.path}>
-                <a
-                  className={`group flex items-center gap-3 px-3.5 py-3 rounded-xl transition-all ${
+                <div
+                  className={`group flex items-center gap-3 px-3.5 py-3 rounded-xl transition-all cursor-pointer ${
                     location === item.path
                       ? 'gradient-primary text-white font-medium shadow-md'
                       : 'text-foreground hover:bg-muted hover:translate-x-1'
@@ -108,7 +108,7 @@ export default function Sidebar() {
                     <i className={`fas ${item.icon} text-base ${location === item.path ? 'text-white' : 'text-primary'}`}></i>
                   </div>
                   <span className="text-sm font-medium">{item.label}</span>
-                </a>
+                </div>
               </Link>
             ))}
           </div>
@@ -136,10 +136,10 @@ export default function Sidebar() {
               />
             </div>
             <Link href="/settings">
-              <a className="text-xs font-semibold text-primary hover:text-primary/80 mt-3 inline-flex items-center gap-1 transition-colors" data-testid="link-upgrade">
+              <div className="text-xs font-semibold text-primary hover:text-primary/80 mt-3 inline-flex items-center gap-1 transition-colors cursor-pointer" data-testid="link-upgrade">
                 Actualizar plan
                 <i className="fas fa-arrow-right text-[10px]"></i>
-              </a>
+              </div>
             </Link>
           </div>
         </div>
