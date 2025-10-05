@@ -390,6 +390,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
         ...req.body,
         tenantId: req.tenantId,
       });
+      
+      // Validate no active contracts for the same property with overlapping dates
+      const existingContracts = await storage.getContractsByProperty(contractData.propertyId, req.tenantId);
+      const activeStatuses = ['signed', 'active', 'expiring'];
+      const newStart = new Date(contractData.startDate);
+      const newEnd = new Date(contractData.endDate);
+      
+      for (const existing of existingContracts) {
+        if (!activeStatuses.includes(existing.status)) continue;
+        
+        const existStart = new Date(existing.startDate);
+        const existEnd = new Date(existing.endDate);
+        
+        // Check for date overlap
+        if (newStart <= existEnd && newEnd >= existStart) {
+          return res.status(400).json({ 
+            message: `La propiedad ya tiene un contrato activo (${existing.number}) que se superpone con las fechas seleccionadas` 
+          });
+        }
+      }
+      
       const contract = await storage.createContract(contractData);
       res.json(contract);
     } catch (error: any) {
@@ -411,6 +432,39 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   app.patch("/api/contracts/:id", isAuthenticated, withUser, async (req: any, res) => {
     try {
+      // Get existing contract first
+      const existingContract = await storage.getContract(req.params.id, req.tenantId);
+      if (!existingContract) {
+        return res.status(404).json({ message: "Contract not found" });
+      }
+      
+      // If updating dates or property, validate no overlap
+      if (req.body.startDate || req.body.endDate || req.body.propertyId) {
+        const propertyId = req.body.propertyId || existingContract.propertyId;
+        const startDate = req.body.startDate || existingContract.startDate;
+        const endDate = req.body.endDate || existingContract.endDate;
+        
+        const contracts = await storage.getContractsByProperty(propertyId, req.tenantId);
+        const activeStatuses = ['signed', 'active', 'expiring'];
+        const newStart = new Date(startDate);
+        const newEnd = new Date(endDate);
+        
+        for (const existing of contracts) {
+          if (existing.id === req.params.id) continue; // Skip self
+          if (!activeStatuses.includes(existing.status)) continue;
+          
+          const existStart = new Date(existing.startDate);
+          const existEnd = new Date(existing.endDate);
+          
+          // Check for date overlap
+          if (newStart <= existEnd && newEnd >= existStart) {
+            return res.status(400).json({ 
+              message: `La propiedad ya tiene un contrato activo (${existing.number}) que se superpone con las fechas seleccionadas` 
+            });
+          }
+        }
+      }
+      
       const contract = await storage.updateContract(req.params.id, req.tenantId, req.body);
       if (!contract) {
         return res.status(404).json({ message: "Contract not found" });

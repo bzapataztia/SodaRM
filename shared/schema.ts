@@ -1,5 +1,5 @@
 import { sql } from "drizzle-orm";
-import { pgTable, text, varchar, integer, numeric, date, timestamp, boolean, pgEnum, json, jsonb, index } from "drizzle-orm/pg-core";
+import { pgTable, text, varchar, integer, numeric, date, timestamp, boolean, pgEnum, json, jsonb, index, uniqueIndex } from "drizzle-orm/pg-core";
 import { relations } from "drizzle-orm";
 import { createInsertSchema } from "drizzle-zod";
 import { z } from "zod";
@@ -78,7 +78,9 @@ export const properties = pgTable("properties", {
   status: propertyStatusEnum("status").notNull().default("available"),
   ownerContactId: varchar("owner_contact_id").references(() => contacts.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (table) => ({
+  uniquePropertyCode: uniqueIndex("unique_property_code_per_tenant").on(table.tenantId, table.code),
+}));
 
 // Insurers
 export const insurers = pgTable("insurers", {
@@ -103,7 +105,9 @@ export const policies = pgTable("policies", {
   endDate: date("end_date").notNull(),
   status: policyStatusEnum("status").notNull().default("active"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (table) => ({
+  uniquePolicyNumber: uniqueIndex("unique_policy_number_per_tenant").on(table.tenantId, table.policyNumber),
+}));
 
 // Contracts
 export const contracts = pgTable("contracts", {
@@ -122,7 +126,9 @@ export const contracts = pgTable("contracts", {
   status: contractStatusEnum("status").notNull().default("draft"),
   policyId: varchar("policy_id").references(() => policies.id),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (table) => ({
+  uniqueContractNumber: uniqueIndex("unique_contract_number_per_tenant").on(table.tenantId, table.number),
+}));
 
 // Invoices
 export const invoices = pgTable("invoices", {
@@ -141,7 +147,9 @@ export const invoices = pgTable("invoices", {
   amountPaid: numeric("amount_paid", { precision: 15, scale: 2 }).notNull().default("0"),
   status: invoiceStatusEnum("status").notNull().default("draft"),
   createdAt: timestamp("created_at").notNull().defaultNow(),
-});
+}, (table) => ({
+  uniqueInvoiceNumber: uniqueIndex("unique_invoice_number_per_tenant").on(table.tenantId, table.number),
+}));
 
 // Invoice Charges (line items)
 export const invoiceCharges = pgTable("invoice_charges", {
