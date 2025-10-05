@@ -46,7 +46,11 @@ export default function KPICard({ title, value, icon, trend, subtitle, variant =
       
       {trend && (
         <div className={`flex items-center gap-1.5 text-sm`}>
-          <span className={`flex items-center gap-1 font-medium ${trend.isPositive ? 'text-success' : 'text-destructive'}`}>
+          <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md font-medium ${
+            trend.isPositive 
+              ? 'bg-success/10 text-success' 
+              : 'bg-destructive/10 text-destructive'
+          }`}>
             <i className={`fas fa-arrow-${trend.isPositive ? 'up' : 'down'} text-xs`}></i>
             {trend.value}
           </span>

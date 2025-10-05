@@ -19,6 +19,7 @@ import InsurersPage from "./pages/insurers";
 import PoliciesPage from "./pages/policies";
 import OCRInboxPage from "./pages/ocr-inbox";
 import SettingsPage from "./pages/settings";
+import SearchPage from "./pages/search";
 import NotFound from "./pages/not-found";
 
 function AppRouter() {
@@ -43,6 +44,7 @@ function AppRouter() {
   return (
     <Switch>
       <Route path="/" component={DashboardPage} />
+      <Route path="/search" component={SearchPage} />
       <Route path="/contracts" component={ContractsPage} />
       <Route path="/invoices" component={InvoicesPage} />
       <Route path="/invoices/:id" component={InvoiceDetailPage} />

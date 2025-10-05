@@ -1,11 +1,15 @@
 import { Link, useLocation } from 'wouter';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
-import type { Invoice } from '@shared/schema';
+import type { Invoice, Tenant } from '@shared/schema';
 
 export default function Sidebar() {
   const [location] = useLocation();
-  const { tenant } = useAuth();
+  const { tenant: authTenant } = useAuth();
+
+  const { data: tenant } = useQuery<Tenant>({
+    queryKey: ['/api/tenants/current'],
+  });
 
   const { data: invoices = [] } = useQuery<Invoice[]>({
     queryKey: ['/api/invoices'],
@@ -33,14 +37,23 @@ export default function Sidebar() {
     { path: '/settings', icon: 'fa-cog', label: 'Ajustes' },
   ];
 
-  const propertiesUsage = tenant?.propertiesCount || 0;
-  const maxProperties = tenant?.maxProperties || 10;
+  const propertiesUsage = authTenant?.propertiesCount || 0;
+  const maxProperties = tenant?.maxProperties || authTenant?.maxProperties || 10;
 
   return (
     <aside className="w-64 bg-card border-r border-border flex flex-col h-screen">
       <div className="p-6 border-b border-border">
         <div className="mb-4">
-          <h1 className="text-2xl font-black text-foreground">soda</h1>
+          {tenant?.logo ? (
+            <img 
+              src={tenant.logo} 
+              alt={tenant.name || 'Logo'} 
+              className="h-10 object-contain"
+              data-testid="img-sidebar-logo"
+            />
+          ) : (
+            <h1 className="text-2xl font-black text-foreground">soda</h1>
+          )}
         </div>
         <div>
           <h2 className="text-sm font-semibold text-foreground">Rental Manager</h2>

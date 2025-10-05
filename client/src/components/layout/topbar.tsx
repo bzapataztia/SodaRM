@@ -1,9 +1,13 @@
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useState } from 'react';
+import { useLocation } from 'wouter';
 
 export default function Topbar() {
   const { user } = useAuth();
+  const [, setLocation] = useLocation();
+  const [searchTerm, setSearchTerm] = useState('');
 
   const userName = user?.firstName && user?.lastName 
     ? `${user.firstName} ${user.lastName}`
@@ -16,18 +20,27 @@ export default function Topbar() {
     .toUpperCase()
     .slice(0, 2) || 'U';
 
+  const handleSearch = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (searchTerm.trim()) {
+      setLocation(`/search?q=${encodeURIComponent(searchTerm.trim())}`);
+    }
+  };
+
   return (
     <header className="h-16 bg-card border-b border-border flex items-center justify-between px-6">
       <div className="flex items-center gap-4 flex-1 max-w-md">
-        <div className="relative flex-1">
+        <form onSubmit={handleSearch} className="relative flex-1">
           <i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm"></i>
           <Input 
             type="text" 
             placeholder="Buscar propiedades, inquilinos..." 
             className="pl-10 bg-muted/50 border-0 h-10"
             data-testid="input-search"
+            value={searchTerm}
+            onChange={(e) => setSearchTerm(e.target.value)}
           />
-        </div>
+        </form>
       </div>
 
       <div className="flex items-center gap-4">
