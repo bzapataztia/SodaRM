@@ -1,11 +1,13 @@
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useSidebar } from '@/contexts/SidebarContext';
 import { useState } from 'react';
 import { useLocation } from 'wouter';
 
 export default function Topbar() {
   const { user } = useAuth();
+  const { toggle } = useSidebar();
   const [, setLocation] = useLocation();
   const [searchTerm, setSearchTerm] = useState('');
 
@@ -30,6 +32,13 @@ export default function Topbar() {
   return (
     <header className="h-16 bg-card border-b border-border flex items-center justify-between px-6">
       <div className="flex items-center gap-4 flex-1 max-w-md">
+        <button
+          onClick={toggle}
+          className="lg:hidden w-10 h-10 rounded-lg hover:bg-muted text-foreground transition-all flex items-center justify-center"
+          data-testid="button-menu-toggle"
+        >
+          <i className="fas fa-bars text-lg"></i>
+        </button>
         <form onSubmit={handleSearch} className="relative flex-1">
           <i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm"></i>
           <Input 

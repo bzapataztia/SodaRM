@@ -1,12 +1,49 @@
 import cron from 'node-cron';
 import { db } from '../db';
 import { invoices, contracts } from '@shared/schema';
-import { eq, and, lte, gte } from 'drizzle-orm';
+import { eq, and, lte, gte, lt } from 'drizzle-orm';
 import { applyLateFee } from '../services/invoiceEngine';
 import { sendReminderD3, sendReminderD1, sendInsurerMonthlyReport } from '../services/emailService';
 import { generateInsurerMonthlyReport } from '../services/pdfService';
 
 export function startScheduler() {
+  // Update overdue invoices status (every hour)
+  cron.schedule('0 * * * *', async () => {
+    console.log('Running overdue status update job...');
+    
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const todayStr = today.toISOString().split('T')[0];
+
+    try {
+      const result = await db.query.invoices.findMany({
+        where: and(
+          lt(invoices.dueDate, todayStr),
+          eq(invoices.status, 'issued')
+        ),
+      });
+
+      const partialInvoices = await db.query.invoices.findMany({
+        where: and(
+          lt(invoices.dueDate, todayStr),
+          eq(invoices.status, 'partial')
+        ),
+      });
+
+      const allOverdueInvoices = [...result, ...partialInvoices];
+
+      for (const invoice of allOverdueInvoices) {
+        await db
+          .update(invoices)
+          .set({ status: 'overdue' })
+          .where(eq(invoices.id, invoice.id));
+      }
+
+      console.log(`Updated ${allOverdueInvoices.length} invoices to overdue status`);
+    } catch (error) {
+      console.error('Failed to update overdue invoices:', error);
+    }
+  });
   // D-3 Reminders (08:00 daily)
   cron.schedule('0 8 * * *', async () => {
     console.log('Running D-3 reminders job...');

@@ -1,11 +1,13 @@
 import { Link, useLocation } from 'wouter';
 import { useAuth } from '@/hooks/useAuth';
 import { useQuery } from '@tanstack/react-query';
+import { useSidebar } from '@/contexts/SidebarContext';
 import type { Invoice, Tenant } from '@shared/schema';
 
 export default function Sidebar() {
   const [location] = useLocation();
   const { tenant: authTenant } = useAuth();
+  const { isOpen, close } = useSidebar();
 
   const { data: tenant } = useQuery<Tenant>({
     queryKey: ['/api/tenants/current'],
@@ -40,8 +42,26 @@ export default function Sidebar() {
   const propertiesUsage = authTenant?.propertiesCount || 0;
   const maxProperties = tenant?.maxProperties || authTenant?.maxProperties || 10;
 
+  const handleLinkClick = () => {
+    close();
+  };
+
   return (
-    <aside className="w-64 bg-card border-r border-border flex flex-col h-screen">
+    <>
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/50 z-40 lg:hidden" 
+          onClick={close}
+          data-testid="sidebar-overlay"
+        />
+      )}
+      <aside className={`
+        fixed lg:sticky top-0 left-0 h-screen
+        w-64 bg-card border-r border-border flex flex-col 
+        z-50 lg:z-auto
+        transition-transform duration-300 ease-in-out
+        ${isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'}
+      `}>
       <div className="p-6 border-b border-border">
         <div className="mb-4">
           {tenant?.logo ? (
@@ -63,69 +83,81 @@ export default function Sidebar() {
 
       <nav className="flex-1 p-4 overflow-y-auto custom-scrollbar">
         <div className="space-y-0.5">
-          {navItems.map((item) => (
-            <Link key={item.path} href={item.path}>
-              <div
-                className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all cursor-pointer ${
-                  location === item.path
-                    ? 'bg-primary text-white'
-                    : 'text-foreground hover:bg-muted'
-                }`}
-                data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
-              >
-                <i className={`fas ${item.icon} text-base w-5`}></i>
-                <span className="text-sm font-medium flex-1">{item.label}</span>
-                {item.badge !== undefined && (
-                  <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
-                    location === item.path ? 'bg-white/20 text-white' : 'bg-primary/10 text-primary'
-                  }`}>
-                    {item.badge}
-                  </span>
-                )}
-              </div>
-            </Link>
-          ))}
+          {navItems.map((item) => {
+            const isActive = location === item.path;
+            return (
+              <Link key={item.path} href={item.path}>
+                <div
+                  onClick={handleLinkClick}
+                  className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all cursor-pointer ${
+                    isActive
+                      ? 'bg-primary'
+                      : 'hover:bg-muted'
+                  }`}
+                  data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
+                >
+                  <i className={`fas ${item.icon} text-base w-5 ${isActive ? 'text-white' : 'text-foreground'}`}></i>
+                  <span className={`text-sm font-medium flex-1 ${isActive ? 'text-white' : 'text-foreground'}`}>{item.label}</span>
+                  {item.badge !== undefined && (
+                    <span className={`text-xs font-semibold px-2 py-0.5 rounded-full ${
+                      isActive ? 'bg-white/20 text-white' : 'bg-primary/10 text-primary'
+                    }`}>
+                      {item.badge}
+                    </span>
+                  )}
+                </div>
+              </Link>
+            );
+          })}
         </div>
 
         <div className="mt-6 pt-4 border-t border-border">
           <p className="px-3 mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Administración</p>
           <div className="space-y-0.5">
-            {adminItems.map((item) => (
-              <Link key={item.path} href={item.path}>
-                <div
-                  className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all cursor-pointer ${
-                    location === item.path
-                      ? 'bg-primary text-white'
-                      : 'text-foreground hover:bg-muted'
-                  }`}
-                  data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
-                >
-                  <i className={`fas ${item.icon} text-base w-5`}></i>
-                  <span className="text-sm font-medium">{item.label}</span>
-                </div>
-              </Link>
-            ))}
+            {adminItems.map((item) => {
+              const isActive = location === item.path;
+              return (
+                <Link key={item.path} href={item.path}>
+                  <div
+                    onClick={handleLinkClick}
+                    className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all cursor-pointer ${
+                      isActive
+                        ? 'bg-primary'
+                        : 'hover:bg-muted'
+                    }`}
+                    data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
+                  >
+                    <i className={`fas ${item.icon} text-base w-5 ${isActive ? 'text-white' : 'text-foreground'}`}></i>
+                    <span className={`text-sm font-medium ${isActive ? 'text-white' : 'text-foreground'}`}>{item.label}</span>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         </div>
 
         <div className="mt-6 pt-4 border-t border-border">
           <p className="px-3 mb-2 text-xs font-semibold text-muted-foreground uppercase tracking-wide">Configuración</p>
           <div className="space-y-0.5">
-            {settingsItems.map((item) => (
-              <Link key={item.path} href={item.path}>
-                <div
-                  className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all cursor-pointer ${
-                    location === item.path
-                      ? 'bg-primary text-white'
-                      : 'text-foreground hover:bg-muted'
-                  }`}
-                  data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
-                >
-                  <i className={`fas ${item.icon} text-base w-5`}></i>
-                  <span className="text-sm font-medium">{item.label}</span>
-                </div>
-              </Link>
-            ))}
+            {settingsItems.map((item) => {
+              const isActive = location === item.path;
+              return (
+                <Link key={item.path} href={item.path}>
+                  <div
+                    onClick={handleLinkClick}
+                    className={`group flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all cursor-pointer ${
+                      isActive
+                        ? 'bg-primary'
+                        : 'hover:bg-muted'
+                    }`}
+                    data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
+                  >
+                    <i className={`fas ${item.icon} text-base w-5 ${isActive ? 'text-white' : 'text-foreground'}`}></i>
+                    <span className={`text-sm font-medium ${isActive ? 'text-white' : 'text-foreground'}`}>{item.label}</span>
+                  </div>
+                </Link>
+              );
+            })}
           </div>
         </div>
       </nav>
@@ -146,5 +178,6 @@ export default function Sidebar() {
         </div>
       </div>
     </aside>
+    </>
   );
 }

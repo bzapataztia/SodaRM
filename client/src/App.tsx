@@ -3,6 +3,7 @@ import { QueryClientProvider } from "@tanstack/react-query";
 import { queryClient } from "./lib/queryClient";
 import { Toaster } from "@/components/ui/toaster";
 import { TooltipProvider } from "@/components/ui/tooltip";
+import { SidebarProvider } from "@/contexts/SidebarContext";
 import { useAuth } from "./hooks/useAuth";
 
 // Pages
@@ -65,7 +66,9 @@ function App() {
     <QueryClientProvider client={queryClient}>
       <TooltipProvider>
         <Toaster />
-        <AppRouter />
+        <SidebarProvider>
+          <AppRouter />
+        </SidebarProvider>
       </TooltipProvider>
     </QueryClientProvider>
   );
