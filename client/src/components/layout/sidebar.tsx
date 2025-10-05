@@ -128,7 +128,7 @@ export default function Sidebar() {
                     data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
                   >
                     <i className={`fas ${item.icon} text-base w-5 ${isActive ? 'text-white' : 'text-foreground'}`}></i>
-                    <span className={`text-sm font-medium ${isActive ? 'text-white' : 'text-foreground'}`}>{item.label}</span>
+                    <span className={`text-sm font-medium flex-1 ${isActive ? 'text-white' : 'text-foreground'}`}>{item.label}</span>
                   </div>
                 </Link>
               );
