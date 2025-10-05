@@ -262,11 +262,10 @@ function ContractFormDialog({
                   <Select onValueChange={field.onChange} value={field.value}>
                     <FormControl>
                       <SelectTrigger data-testid="select-policy">
-                        <SelectValue placeholder="Seleccionar póliza" />
+                        <SelectValue placeholder="Sin póliza" />
                       </SelectTrigger>
                     </FormControl>
                     <SelectContent>
-                      <SelectItem value="">Sin póliza</SelectItem>
                       {policies.map((policy) => (
                         <SelectItem key={policy.id} value={policy.id}>
                           {policy.policyNumber} - {policy.status === 'active' ? 'Activa' : 'Expirada'}
