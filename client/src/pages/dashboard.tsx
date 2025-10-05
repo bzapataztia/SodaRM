@@ -3,7 +3,7 @@ import { Link } from 'wouter';
 import Sidebar from '@/components/layout/sidebar';
 import Topbar from '@/components/layout/topbar';
 import KPICard from '@/components/kpi-card';
-import type { Tenant, Invoice } from '@shared/schema';
+import type { Tenant, Invoice, Contact } from '@shared/schema';
 
 interface DashboardStats {
   issued: number;
@@ -21,11 +21,20 @@ export default function DashboardPage() {
     queryKey: ['/api/invoices'],
   });
 
+  const { data: contacts = [] } = useQuery<Contact[]>({
+    queryKey: ['/api/contacts'],
+  });
+
   const { data: tenant } = useQuery<Tenant>({
     queryKey: ['/api/tenants/current'],
   });
 
   const recentInvoices = invoices.slice(0, 5);
+
+  const getContactName = (contactId: string) => {
+    const contact = contacts.find(c => c.id === contactId);
+    return contact?.fullName || 'N/A';
+  };
 
   if (isLoading) {
     return (
@@ -103,34 +112,42 @@ export default function DashboardPage() {
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-              <KPICard
-                title="Emitido Este Mes"
-                value={formatCurrency(stats?.issued || 0)}
-                icon="fa-file-invoice"
-                trend={{ value: '+12.5%', isPositive: true, label: 'vs mes anterior' }}
-                variant="default"
-              />
-              <KPICard
-                title="Vencido"
-                value={formatCurrency(stats?.overdue || 0)}
-                icon="fa-exclamation-triangle"
-                subtitle={`${invoices?.filter((inv: any) => inv.status === 'overdue').length || 0} facturas vencidas`}
-                variant="danger"
-              />
-              <KPICard
-                title="Cobrado Este Mes"
-                value={formatCurrency(stats?.collected || 0)}
-                icon="fa-check-circle"
-                trend={{ value: '+8.3%', isPositive: true, label: 'vs mes anterior' }}
-                variant="success"
-              />
-              <KPICard
-                title="% Recuperación"
-                value={`${stats?.recovery || 0}%`}
-                icon="fa-chart-line"
-                trend={{ value: '-2.1%', isPositive: false, label: 'vs mes anterior' }}
-                variant="warning"
-              />
+              <div data-testid="kpi-emitido">
+                <KPICard
+                  title="Emitido Este Mes"
+                  value={formatCurrency(stats?.issued || 0)}
+                  icon="fa-file-invoice"
+                  trend={{ value: '+12.5%', isPositive: true, label: 'vs mes anterior' }}
+                  variant="default"
+                />
+              </div>
+              <div data-testid="kpi-vencido">
+                <KPICard
+                  title="Vencido"
+                  value={formatCurrency(stats?.overdue || 0)}
+                  icon="fa-exclamation-triangle"
+                  subtitle={`${invoices.filter(inv => inv.status === 'overdue').length} facturas vencidas`}
+                  variant="danger"
+                />
+              </div>
+              <div data-testid="kpi-cobrado">
+                <KPICard
+                  title="Cobrado Este Mes"
+                  value={formatCurrency(stats?.collected || 0)}
+                  icon="fa-check-circle"
+                  trend={{ value: '+8.3%', isPositive: true, label: 'vs mes anterior' }}
+                  variant="success"
+                />
+              </div>
+              <div data-testid="kpi-recuperacion">
+                <KPICard
+                  title="% Recuperación"
+                  value={`${stats?.recovery || 0}%`}
+                  icon="fa-chart-line"
+                  trend={{ value: '-2.1%', isPositive: false, label: 'vs mes anterior' }}
+                  variant="warning"
+                />
+              </div>
             </div>
 
             <div className="bg-card rounded-xl border border-border p-6">
@@ -139,7 +156,10 @@ export default function DashboardPage() {
               <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                 {quickActions.map((action) => (
                   <Link key={action.label} href={action.href}>
-                    <div className="flex flex-col items-center text-center p-4 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group">
+                    <div 
+                      className="flex flex-col items-center text-center p-4 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group"
+                      data-testid={`card-quick-action-${action.label.toLowerCase().replace(/\s+/g, '-')}`}
+                    >
                       <div className={`w-14 h-14 ${action.bgColor} rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
                         <i className={`fas ${action.icon} text-xl ${action.iconColor}`}></i>
                       </div>
@@ -201,27 +221,33 @@ export default function DashboardPage() {
                         </td>
                       </tr>
                     ) : (
-                      recentInvoices.map((invoice: any) => (
-                        <tr key={invoice.id} className="hover:bg-muted/30 transition-colors">
+                      recentInvoices.map((invoice) => (
+                        <tr key={invoice.id} className="hover:bg-muted/30 transition-colors" data-testid={`row-invoice-${invoice.id}`}>
                           <td className="px-6 py-4 whitespace-nowrap">
                             <div className="flex items-center gap-2">
                               <i className="fas fa-file-alt text-muted-foreground text-sm"></i>
-                              <span className="text-sm font-medium text-foreground">{invoice.number}</span>
+                              <span className="text-sm font-medium text-foreground" data-testid={`text-invoice-number-${invoice.id}`}>
+                                {invoice.number}
+                              </span>
                             </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="text-sm text-foreground">{invoice.tenantContact?.fullName}</span>
+                            <span className="text-sm text-foreground" data-testid={`text-tenant-${invoice.id}`}>
+                              {getContactName(invoice.tenantContactId)}
+                            </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="text-sm font-semibold text-foreground">
+                            <span className="text-sm font-semibold text-foreground" data-testid={`text-total-${invoice.id}`}>
                               {formatCurrency(parseFloat(invoice.totalAmount))}
                             </span>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            {getStatusBadge(invoice.status)}
+                            <div data-testid={`status-${invoice.id}`}>
+                              {getStatusBadge(invoice.status)}
+                            </div>
                           </td>
                           <td className="px-6 py-4 whitespace-nowrap">
-                            <span className="text-sm text-foreground">
+                            <span className="text-sm text-foreground" data-testid={`text-due-date-${invoice.id}`}>
                               {new Date(invoice.dueDate).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}
                             </span>
                           </td>
