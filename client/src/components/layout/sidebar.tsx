@@ -28,74 +28,86 @@ export default function Sidebar() {
   const usagePercentage = (propertiesUsage / maxProperties) * 100;
 
   return (
-    <aside className="w-64 bg-card border-r border-border flex flex-col h-screen">
+    <aside className="w-72 bg-card border-r border-border flex flex-col h-screen shadow-sm">
       <div className="p-6 border-b border-border">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 bg-primary rounded-lg flex items-center justify-center">
-            <i className="fas fa-building text-primary-foreground text-xl"></i>
+          <div className="w-12 h-12 gradient-primary rounded-xl flex items-center justify-center shadow-lg">
+            <i className="fas fa-building text-white text-xl"></i>
           </div>
-          <div>
-            <h1 className="text-lg font-bold text-foreground">Rental Manager</h1>
-            <p className="text-xs text-muted-foreground">{tenant?.name || 'Mi Inmobiliaria'}</p>
+          <div className="flex-1 min-w-0">
+            <h1 className="text-lg font-bold text-foreground truncate">Rental Manager</h1>
+            <p className="text-xs text-muted-foreground truncate">{tenant?.name || 'Mi Inmobiliaria'}</p>
           </div>
         </div>
       </div>
 
       <nav className="flex-1 p-4 overflow-y-auto custom-scrollbar">
-        <div className="space-y-1">
+        <div className="space-y-1.5">
           {navItems.map((item) => (
             <Link key={item.path} href={item.path}>
               <a
-                className={`flex items-center gap-3 px-3 py-2 rounded-md ${
+                className={`group flex items-center gap-3 px-3.5 py-3 rounded-xl transition-all ${
                   location === item.path
-                    ? 'bg-primary text-primary-foreground font-medium'
-                    : 'text-foreground hover:bg-muted'
+                    ? 'gradient-primary text-white font-medium shadow-md'
+                    : 'text-foreground hover:bg-muted hover:translate-x-1'
                 }`}
                 data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
               >
-                <i className={`fas ${item.icon} w-5`}></i>
-                <span>{item.label}</span>
+                <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
+                  location === item.path ? 'bg-white/20' : 'bg-muted group-hover:bg-primary/10'
+                }`}>
+                  <i className={`fas ${item.icon} text-base ${location === item.path ? 'text-white' : 'text-primary'}`}></i>
+                </div>
+                <span className="text-sm font-medium">{item.label}</span>
               </a>
             </Link>
           ))}
         </div>
 
-        <div className="mt-6 pt-6 border-t border-border">
-          <p className="px-3 mb-2 text-xs font-semibold text-muted-foreground uppercase">Administración</p>
-          <div className="space-y-1">
+        <div className="mt-8 pt-6 border-t border-border">
+          <p className="px-3.5 mb-3 text-xs font-bold text-muted-foreground uppercase tracking-wider">Administración</p>
+          <div className="space-y-1.5">
             {adminItems.map((item) => (
               <Link key={item.path} href={item.path}>
                 <a
-                  className={`flex items-center gap-3 px-3 py-2 rounded-md ${
+                  className={`group flex items-center gap-3 px-3.5 py-3 rounded-xl transition-all ${
                     location === item.path
-                      ? 'bg-primary text-primary-foreground font-medium'
-                      : 'text-foreground hover:bg-muted'
+                      ? 'gradient-primary text-white font-medium shadow-md'
+                      : 'text-foreground hover:bg-muted hover:translate-x-1'
                   }`}
                   data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
                 >
-                  <i className={`fas ${item.icon} w-5`}></i>
-                  <span>{item.label}</span>
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
+                    location === item.path ? 'bg-white/20' : 'bg-muted group-hover:bg-primary/10'
+                  }`}>
+                    <i className={`fas ${item.icon} text-base ${location === item.path ? 'text-white' : 'text-primary'}`}></i>
+                  </div>
+                  <span className="text-sm font-medium">{item.label}</span>
                 </a>
               </Link>
             ))}
           </div>
         </div>
 
-        <div className="mt-6 pt-6 border-t border-border">
-          <p className="px-3 mb-2 text-xs font-semibold text-muted-foreground uppercase">Configuración</p>
-          <div className="space-y-1">
+        <div className="mt-8 pt-6 border-t border-border">
+          <p className="px-3.5 mb-3 text-xs font-bold text-muted-foreground uppercase tracking-wider">Configuración</p>
+          <div className="space-y-1.5">
             {settingsItems.map((item) => (
               <Link key={item.path} href={item.path}>
                 <a
-                  className={`flex items-center gap-3 px-3 py-2 rounded-md ${
+                  className={`group flex items-center gap-3 px-3.5 py-3 rounded-xl transition-all ${
                     location === item.path
-                      ? 'bg-primary text-primary-foreground font-medium'
-                      : 'text-foreground hover:bg-muted'
+                      ? 'gradient-primary text-white font-medium shadow-md'
+                      : 'text-foreground hover:bg-muted hover:translate-x-1'
                   }`}
                   data-testid={`nav-${item.label.toLowerCase().replace(/\s+/g, '-')}`}
                 >
-                  <i className={`fas ${item.icon} w-5`}></i>
-                  <span>{item.label}</span>
+                  <div className={`w-9 h-9 rounded-lg flex items-center justify-center ${
+                    location === item.path ? 'bg-white/20' : 'bg-muted group-hover:bg-primary/10'
+                  }`}>
+                    <i className={`fas ${item.icon} text-base ${location === item.path ? 'text-white' : 'text-primary'}`}></i>
+                  </div>
+                  <span className="text-sm font-medium">{item.label}</span>
                 </a>
               </Link>
             ))}
@@ -104,24 +116,32 @@ export default function Sidebar() {
       </nav>
 
       <div className="p-4 border-t border-border">
-        <div className="bg-muted rounded-lg p-3">
-          <div className="flex items-center justify-between mb-2">
-            <span className="text-xs font-medium text-foreground">Plan {tenant?.plan || 'Trial'}</span>
-            <span className="text-xs text-muted-foreground">
-              {propertiesUsage}/{maxProperties}
-            </span>
+        <div className="relative overflow-hidden bg-gradient-to-br from-primary/5 to-primary/10 rounded-xl p-4 border border-primary/20">
+          <div className="relative z-10">
+            <div className="flex items-center justify-between mb-3">
+              <div className="flex items-center gap-2">
+                <div className="w-8 h-8 rounded-lg gradient-primary flex items-center justify-center">
+                  <i className="fas fa-crown text-white text-xs"></i>
+                </div>
+                <span className="text-sm font-bold text-foreground">Plan {tenant?.plan || 'Trial'}</span>
+              </div>
+              <span className="text-xs font-semibold text-primary bg-primary/10 px-2 py-1 rounded-md">
+                {propertiesUsage}/{maxProperties}
+              </span>
+            </div>
+            <div className="w-full bg-background/80 rounded-full h-2.5 overflow-hidden">
+              <div
+                className="gradient-primary h-full rounded-full transition-all shadow-sm"
+                style={{ width: `${usagePercentage}%` }}
+              />
+            </div>
+            <Link href="/settings">
+              <a className="text-xs font-semibold text-primary hover:text-primary/80 mt-3 inline-flex items-center gap-1 transition-colors" data-testid="link-upgrade">
+                Actualizar plan
+                <i className="fas fa-arrow-right text-[10px]"></i>
+              </a>
+            </Link>
           </div>
-          <div className="w-full bg-background rounded-full h-2 overflow-hidden">
-            <div
-              className="bg-accent h-full rounded-full transition-all"
-              style={{ width: `${usagePercentage}%` }}
-            />
-          </div>
-          <Link href="/settings">
-            <a className="text-xs text-primary hover:underline mt-2 inline-block" data-testid="link-upgrade">
-              Actualizar plan →
-            </a>
-          </Link>
         </div>
       </div>
     </aside>
