@@ -1,16 +1,23 @@
 import { useQuery } from '@tanstack/react-query';
+import { Link } from 'wouter';
 import Sidebar from '@/components/layout/sidebar';
 import Topbar from '@/components/layout/topbar';
 import KPICard from '@/components/kpi-card';
-import { api } from '@/lib/api';
-import type { Tenant } from '@shared/schema';
+import type { Tenant, Invoice } from '@shared/schema';
+
+interface DashboardStats {
+  issued: number;
+  overdue: number;
+  collected: number;
+  recovery: number;
+}
 
 export default function DashboardPage() {
-  const { data: stats, isLoading } = useQuery({
+  const { data: stats, isLoading } = useQuery<DashboardStats>({
     queryKey: ['/api/dashboard/stats'],
   });
 
-  const { data: invoices } = useQuery({
+  const { data: invoices = [] } = useQuery<Invoice[]>({
     queryKey: ['/api/invoices'],
   });
 
@@ -18,7 +25,7 @@ export default function DashboardPage() {
     queryKey: ['/api/tenants/current'],
   });
 
-  const recentInvoices = invoices?.slice(0, 5) || [];
+  const recentInvoices = invoices.slice(0, 5);
 
   if (isLoading) {
     return (
@@ -36,142 +43,195 @@ export default function DashboardPage() {
     }).format(value);
   };
 
+  const getStatusBadge = (status: string) => {
+    if (status === 'paid') {
+      return <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-success/10 text-success">Pagada</span>;
+    } else if (status === 'overdue') {
+      return <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-destructive/10 text-destructive">Vencida</span>;
+    } else if (status === 'partial') {
+      return <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-warning/10 text-warning">Parcial</span>;
+    } else {
+      return <span className="inline-flex items-center px-3 py-1 rounded-full text-xs font-medium bg-primary/10 text-primary">Enviada</span>;
+    }
+  };
+
+  const quickActions = [
+    { 
+      label: 'Nueva Factura', 
+      description: 'Crear factura de alquiler', 
+      icon: 'fa-file-invoice',
+      bgColor: 'bg-blue-500/10',
+      iconColor: 'text-blue-500',
+      href: '/invoices'
+    },
+    { 
+      label: 'Agregar Propiedad', 
+      description: 'Registrar nueva propiedad', 
+      icon: 'fa-home',
+      bgColor: 'bg-green-500/10',
+      iconColor: 'text-green-500',
+      href: '/properties'
+    },
+    { 
+      label: 'Nuevo Inquilino', 
+      description: 'Registrar nuevo contacto', 
+      icon: 'fa-user-plus',
+      bgColor: 'bg-purple-500/10',
+      iconColor: 'text-purple-500',
+      href: '/contacts'
+    },
+    { 
+      label: 'Registrar Pago', 
+      description: 'Marcar pago recibido', 
+      icon: 'fa-money-bill',
+      bgColor: 'bg-orange-500/10',
+      iconColor: 'text-orange-500',
+      href: '/payments'
+    },
+  ];
+
   return (
     <div className="flex h-screen overflow-hidden bg-background">
       <Sidebar />
       <div className="flex-1 flex flex-col overflow-hidden">
         <Topbar />
-        <main className="flex-1 overflow-y-auto custom-scrollbar p-8">
-          <div className="max-w-7xl mx-auto space-y-8">
-            <div className="flex items-center gap-5">
-              {tenant?.logo && (
-                <div className="flex-shrink-0">
-                  <img 
-                    src={tenant.logo} 
-                    alt={tenant.name || 'Logo'} 
-                    className="h-20 w-20 object-contain rounded-xl border-2 border-border shadow-sm"
-                    data-testid="img-tenant-logo"
-                  />
-                </div>
-              )}
-              <div>
-                <h1 className="text-4xl font-bold tracking-tight bg-gradient-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-                  Cartera Hoy
-                </h1>
-                <p className="text-muted-foreground mt-2 text-base">Vista general de tu cartera de arriendos</p>
-              </div>
+        <main className="flex-1 overflow-y-auto custom-scrollbar p-6">
+          <div className="max-w-7xl mx-auto space-y-6">
+            <div>
+              <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
+              <p className="text-sm text-muted-foreground mt-1">Vista general de tu cartera de arriendos</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
               <KPICard
                 title="Emitido Este Mes"
                 value={formatCurrency(stats?.issued || 0)}
                 icon="fa-file-invoice"
-                trend={{ value: '12.5%', isPositive: true }}
+                trend={{ value: '+12.5%', isPositive: true, label: 'vs mes anterior' }}
                 variant="default"
               />
               <KPICard
                 title="Vencido"
                 value={formatCurrency(stats?.overdue || 0)}
                 icon="fa-exclamation-triangle"
+                subtitle={`${invoices?.filter((inv: any) => inv.status === 'overdue').length || 0} facturas vencidas`}
                 variant="danger"
               />
               <KPICard
                 title="Cobrado Este Mes"
                 value={formatCurrency(stats?.collected || 0)}
                 icon="fa-check-circle"
-                trend={{ value: '8.3%', isPositive: true }}
+                trend={{ value: '+8.3%', isPositive: true, label: 'vs mes anterior' }}
                 variant="success"
               />
               <KPICard
                 title="% Recuperación"
                 value={`${stats?.recovery || 0}%`}
-                icon="fa-percentage"
+                icon="fa-chart-line"
+                trend={{ value: '-2.1%', isPositive: false, label: 'vs mes anterior' }}
                 variant="warning"
               />
             </div>
 
-            <div className="bg-card rounded-2xl border border-border overflow-hidden shadow-sm">
-              <div className="px-6 py-5 border-b border-border bg-gradient-to-r from-background to-muted/30">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-xl font-bold text-foreground">Facturas Recientes</h2>
-                    <p className="text-sm text-muted-foreground mt-1">Últimas facturas emitidas en el sistema</p>
-                  </div>
-                  <div className="w-10 h-10 rounded-xl bg-primary/10 flex items-center justify-center">
-                    <i className="fas fa-file-invoice text-primary"></i>
-                  </div>
+            <div className="bg-card rounded-xl border border-border p-6">
+              <h2 className="text-lg font-semibold text-foreground mb-1">Acciones Rápidas</h2>
+              <p className="text-sm text-muted-foreground mb-4">Tareas más frecuentes de tu día a día</p>
+              <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                {quickActions.map((action) => (
+                  <Link key={action.label} href={action.href}>
+                    <div className="flex flex-col items-center text-center p-4 rounded-lg hover:bg-muted/50 transition-colors cursor-pointer group">
+                      <div className={`w-14 h-14 ${action.bgColor} rounded-full flex items-center justify-center mb-3 group-hover:scale-110 transition-transform`}>
+                        <i className={`fas ${action.icon} text-xl ${action.iconColor}`}></i>
+                      </div>
+                      <h3 className="text-sm font-semibold text-foreground mb-1">{action.label}</h3>
+                      <p className="text-xs text-muted-foreground">{action.description}</p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            </div>
+
+            <div className="bg-card rounded-xl border border-border overflow-hidden">
+              <div className="px-6 py-4 border-b border-border flex items-center justify-between">
+                <div>
+                  <h2 className="text-lg font-semibold text-foreground">Facturas Recientes</h2>
+                  <p className="text-sm text-muted-foreground">Últimas facturas emitidas en el sistema</p>
                 </div>
+                <Link href="/invoices">
+                  <div className="text-sm font-medium text-primary hover:text-primary/80 transition-colors cursor-pointer" data-testid="link-view-all">
+                    Ver todas
+                  </div>
+                </Link>
               </div>
 
               <div className="overflow-x-auto">
                 <table className="w-full">
                   <thead>
-                    <tr className="bg-muted/50">
-                      <th className="px-6 py-4 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                    <tr className="border-b border-border">
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground">
                         Número
                       </th>
-                      <th className="px-6 py-4 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground">
                         Inquilino
                       </th>
-                      <th className="px-6 py-4 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground">
                         Total
                       </th>
-                      <th className="px-6 py-4 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground">
                         Estado
                       </th>
-                      <th className="px-6 py-4 text-left text-xs font-bold text-muted-foreground uppercase tracking-wider">
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground">
+                        Vencimiento
+                      </th>
+                      <th className="px-6 py-3 text-left text-xs font-semibold text-muted-foreground">
                         Acciones
                       </th>
                     </tr>
                   </thead>
-                  <tbody className="divide-y divide-border bg-card">
+                  <tbody className="divide-y divide-border">
                     {recentInvoices.length === 0 ? (
                       <tr>
-                        <td colSpan={5} className="px-6 py-12 text-center">
+                        <td colSpan={6} className="px-6 py-12 text-center">
                           <div className="flex flex-col items-center gap-3">
-                            <div className="w-16 h-16 rounded-full bg-muted flex items-center justify-center">
-                              <i className="fas fa-inbox text-2xl text-muted-foreground"></i>
+                            <div className="w-12 h-12 rounded-full bg-muted flex items-center justify-center">
+                              <i className="fas fa-inbox text-xl text-muted-foreground"></i>
                             </div>
-                            <p className="text-muted-foreground font-medium">No hay facturas registradas</p>
+                            <p className="text-sm text-muted-foreground">No hay facturas registradas</p>
                           </div>
                         </td>
                       </tr>
                     ) : (
                       recentInvoices.map((invoice: any) => (
                         <tr key={invoice.id} className="hover:bg-muted/30 transition-colors">
-                          <td className="px-6 py-5 whitespace-nowrap">
-                            <span className="text-sm font-bold font-mono text-foreground">{invoice.number}</span>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <div className="flex items-center gap-2">
+                              <i className="fas fa-file-alt text-muted-foreground text-sm"></i>
+                              <span className="text-sm font-medium text-foreground">{invoice.number}</span>
+                            </div>
                           </td>
-                          <td className="px-6 py-5 whitespace-nowrap">
-                            <span className="text-sm font-medium text-foreground">{invoice.tenantContact?.fullName}</span>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className="text-sm text-foreground">{invoice.tenantContact?.fullName}</span>
                           </td>
-                          <td className="px-6 py-5 whitespace-nowrap">
-                            <span className="text-sm font-bold font-mono text-foreground">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className="text-sm font-semibold text-foreground">
                               {formatCurrency(parseFloat(invoice.totalAmount))}
                             </span>
                           </td>
-                          <td className="px-6 py-5 whitespace-nowrap">
-                            <span
-                              className={`inline-flex items-center px-3 py-1.5 rounded-lg text-xs font-bold ${
-                                invoice.status === 'paid'
-                                  ? 'bg-success/15 text-success border border-success/20'
-                                  : invoice.status === 'overdue'
-                                  ? 'bg-destructive/15 text-destructive border border-destructive/20'
-                                  : 'bg-warning/15 text-warning border border-warning/20'
-                              }`}
-                            >
-                              {invoice.status === 'paid' ? 'Pagada' : invoice.status === 'overdue' ? 'Vencida' : 'Emitida'}
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            {getStatusBadge(invoice.status)}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <span className="text-sm text-foreground">
+                              {new Date(invoice.dueDate).toLocaleDateString('es-CO', { day: 'numeric', month: 'short', year: 'numeric' })}
                             </span>
                           </td>
-                          <td className="px-6 py-5 whitespace-nowrap">
-                            <a
-                              href={`/invoices/${invoice.id}`}
-                              className="inline-flex items-center justify-center w-9 h-9 rounded-lg bg-primary/10 text-primary hover:bg-primary hover:text-white transition-all"
-                              data-testid={`link-invoice-${invoice.id}`}
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <button
+                              className="text-muted-foreground hover:text-foreground transition-colors"
+                              data-testid={`button-actions-${invoice.id}`}
                             >
-                              <i className="fas fa-eye"></i>
-                            </a>
+                              <i className="fas fa-ellipsis-h"></i>
+                            </button>
                           </td>
                         </tr>
                       ))

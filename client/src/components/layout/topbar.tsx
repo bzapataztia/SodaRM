@@ -1,5 +1,6 @@
 import { useAuth } from '@/hooks/useAuth';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 
 export default function Topbar() {
   const { user } = useAuth();
@@ -16,43 +17,48 @@ export default function Topbar() {
     .slice(0, 2) || 'U';
 
   return (
-    <header className="h-20 bg-card border-b border-border flex items-center justify-between px-8 shadow-sm">
-      <div className="flex items-center gap-4 flex-1">
-        <button className="lg:hidden w-10 h-10 rounded-lg bg-muted hover:bg-primary/10 text-foreground hover:text-primary transition-colors flex items-center justify-center" data-testid="button-menu">
-          <i className="fas fa-bars text-lg"></i>
-        </button>
+    <header className="h-16 bg-card border-b border-border flex items-center justify-between px-6">
+      <div className="flex items-center gap-4 flex-1 max-w-md">
+        <div className="relative flex-1">
+          <i className="fas fa-search absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-sm"></i>
+          <Input 
+            type="text" 
+            placeholder="Buscar propiedades, inquilinos..." 
+            className="pl-10 bg-muted/50 border-0 h-10"
+            data-testid="input-search"
+          />
+        </div>
       </div>
 
-      <div className="flex items-center gap-6">
-        <button className="relative w-11 h-11 rounded-xl bg-muted hover:bg-primary/10 text-foreground hover:text-primary transition-all flex items-center justify-center group" data-testid="button-notifications">
-          <i className="fas fa-bell text-lg group-hover:animate-pulse"></i>
-          <span className="absolute -top-1.5 -right-1.5 bg-destructive text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow-md">
-            5
+      <div className="flex items-center gap-4">
+        <button className="relative w-10 h-10 rounded-lg hover:bg-muted text-foreground transition-all flex items-center justify-center" data-testid="button-notifications">
+          <i className="fas fa-bell text-lg"></i>
+          <span className="absolute -top-1 -right-1 bg-destructive text-white text-[10px] font-bold w-4 h-4 rounded-full flex items-center justify-center">
+            1
           </span>
         </button>
 
-        <div className="flex items-center gap-4 pl-6 border-l border-border">
-          <div className="text-right">
-            <p className="text-sm font-bold text-foreground">{userName}</p>
-            <p className="text-xs text-muted-foreground capitalize">{user?.role || 'Usuario'}</p>
-          </div>
+        <div className="flex items-center gap-3 pl-4 border-l border-border">
           <div className="relative group">
             <button
-              className="w-11 h-11 gradient-primary rounded-xl flex items-center justify-center text-white font-bold shadow-md hover:shadow-lg transition-all hover:scale-105"
+              className="flex items-center gap-2 hover:bg-muted px-2 py-1.5 rounded-lg transition-colors"
               data-testid="button-user-menu"
             >
-              {userInitials}
+              <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center text-white text-xs font-bold">
+                {userInitials}
+              </div>
+              <span className="text-sm font-semibold text-foreground">{userName}</span>
             </button>
-            <div className="absolute right-0 top-full mt-3 w-56 bg-card border border-border rounded-xl shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all overflow-hidden">
-              <div className="p-2">
+            <div className="absolute right-0 top-full mt-2 w-48 bg-card border border-border rounded-lg shadow-lg opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all overflow-hidden z-50">
+              <div className="p-1">
                 <Button
                   variant="ghost"
-                  className="w-full justify-start hover:bg-destructive/10 hover:text-destructive rounded-lg"
+                  className="w-full justify-start hover:bg-destructive/10 hover:text-destructive rounded-md text-sm"
                   onClick={() => window.location.href = '/api/logout'}
                   data-testid="button-logout"
                 >
-                  <i className="fas fa-sign-out-alt mr-3 text-base"></i>
-                  <span className="font-medium">Cerrar sesión</span>
+                  <i className="fas fa-sign-out-alt mr-2 text-sm"></i>
+                  <span>Cerrar sesión</span>
                 </Button>
               </div>
             </div>
