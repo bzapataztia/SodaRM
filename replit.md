@@ -146,3 +146,25 @@ All tenant-scoped tables include a `tenantId` foreign key. Row-level isolation i
 - **Credential management:** External service credentials are fetched from Replit connectors on-demand rather than cached, ensuring fresh tokens
 - **OCR workflow:** Uploaded documents are processed asynchronously, stored in logs with confidence scores, and require manual approval before creating charges
 - **Scheduled jobs:** Cron tasks run on the main application process for invoice generation (monthly), payment reminders (daily D-3 and D+1), and insurer reports (monthly)
+
+## ¿Cómo sincronizar en Replit los cambios aprobados en GitHub?
+
+Cuando un Pull Request se fusiona en GitHub y deseas traer esos cambios a tu workspace de Replit, sigue estos pasos:
+
+1. **Abrir la consola de Replit**
+   - Haz clic en la pestaña "Shell" (o abre una terminal) dentro de tu proyecto de Replit.
+
+2. **Comprobar el estado local**
+   - Ejecuta `git status` para asegurarte de que no tienes cambios sin commitear. Si los hay, haz commit o descártalos antes de continuar.
+
+3. **Actualizar la rama principal**
+   - Si estás en la rama `main` (o la rama por defecto de tu repo), ejecuta `git pull origin main`.
+   - Si trabajas en otra rama, sustitúyela por el nombre de la rama correspondiente.
+
+4. **Resolver conflictos si aparecen**
+   - Git te avisará si hay conflictos. Edítalos manualmente en Replit, guarda los archivos y termina con `git add`, `git commit` y `git pull --rebase` o `git merge --continue`, según el caso.
+
+5. **Verificar**
+   - Vuelve a ejecutar `git status` para confirmar que la rama está limpia.
+
+> 💡 Consejo: si Replit no tiene configurado el remoto `origin`, añade uno con `git remote add origin https://github.com/tu-usuario/tu-repo.git` antes de hacer `git pull`.
