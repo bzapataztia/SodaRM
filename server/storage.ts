@@ -1,12 +1,12 @@
 import { db } from "./db";
 import { 
   users, tenants, contacts, properties, contracts, invoices, 
-  invoiceCharges, payments, insurers, policies, ocrLogs, auditLogs,
+  invoiceCharges, payments, insurers, policies, ocrLogs, auditLogs, propertyPhotos,
   type User, type UpsertUser, type Tenant, type InsertTenant,
   type Contact, type InsertContact, type Property, type InsertProperty,
   type Contract, type InsertContract, type Invoice, type InsertInvoice,
   type Payment, type InsertPayment, type Insurer, type InsertInsurer,
-  type Policy, type InsertPolicy
+  type Policy, type InsertPolicy, type PropertyPhoto, type InsertPropertyPhoto
 } from "@shared/schema";
 import { eq, and, desc, sql } from "drizzle-orm";
 
@@ -76,6 +76,12 @@ export interface IStorage {
   
   // OCR
   getOCRLogs(tenantId: string, status?: string): Promise<any[]>;
+  
+  // Property Photos
+  getPropertyPhotos(propertyId: string, tenantId: string): Promise<PropertyPhoto[]>;
+  createPropertyPhoto(photo: InsertPropertyPhoto): Promise<PropertyPhoto>;
+  deletePropertyPhoto(id: string, tenantId: string): Promise<void>;
+  getPropertyPhotosCount(propertyId: string, tenantId: string): Promise<number>;
 }
 
 // Helper function to sanitize update payloads
@@ -571,6 +577,31 @@ export class DatabaseStorage implements IStorage {
       .orderBy(desc(invoices.dueDate));
 
     return result;
+  }
+
+  // Property Photos
+  async getPropertyPhotos(propertyId: string, tenantId: string): Promise<PropertyPhoto[]> {
+    return await db.query.propertyPhotos.findMany({
+      where: and(eq(propertyPhotos.propertyId, propertyId), eq(propertyPhotos.tenantId, tenantId)),
+      orderBy: [desc(propertyPhotos.createdAt)],
+    });
+  }
+
+  async createPropertyPhoto(photo: InsertPropertyPhoto): Promise<PropertyPhoto> {
+    const [newPhoto] = await db.insert(propertyPhotos).values(photo).returning();
+    return newPhoto;
+  }
+
+  async deletePropertyPhoto(id: string, tenantId: string): Promise<void> {
+    await db.delete(propertyPhotos)
+      .where(and(eq(propertyPhotos.id, id), eq(propertyPhotos.tenantId, tenantId)));
+  }
+
+  async getPropertyPhotosCount(propertyId: string, tenantId: string): Promise<number> {
+    const result = await db.select({ count: sql<number>`count(*)` })
+      .from(propertyPhotos)
+      .where(and(eq(propertyPhotos.propertyId, propertyId), eq(propertyPhotos.tenantId, tenantId)));
+    return result[0]?.count || 0;
   }
 }
 
