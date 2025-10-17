@@ -55,7 +55,7 @@ export function ObjectUploader({
   );
 
   useEffect(() => {
-    uppy.on("complete", (result) => {
+    const handleComplete = (result: any) => {
       if (result.successful && result.successful.length > 0) {
         const uploadedFile = result.successful[0];
         const uploadUrl = uploadedFile.uploadURL;
@@ -82,17 +82,21 @@ export function ObjectUploader({
             });
         }
       }
-    });
+    };
 
-    uppy.on("error", (error) => {
+    const handleError = (error: Error) => {
       console.error("Upload error:", error);
       if (onUploadError) {
         onUploadError(error);
       }
-    });
+    };
+
+    uppy.on("complete", handleComplete);
+    uppy.on("error", handleError);
 
     return () => {
-      uppy.close();
+      uppy.off("complete", handleComplete);
+      uppy.off("error", handleError);
     };
   }, [uppy, onUploadComplete, onUploadError]);
 

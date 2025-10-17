@@ -206,9 +206,8 @@ export const propertyPhotos = pgTable("property_photos", {
   id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
   tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
   propertyId: varchar("property_id").notNull().references(() => properties.id, { onDelete: "cascade" }),
-  photoUrl: text("photo_url").notNull(),
+  objectPath: text("object_path").notNull(),
   caption: text("caption"),
-  displayOrder: integer("display_order").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
