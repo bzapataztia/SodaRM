@@ -46,6 +46,7 @@ Preferred communication style: Simple, everyday language.
 - **Email Reminder Fix:** Corrected `/api/invoices/:id/remind` endpoint to properly load tenant contact before sending reminder emails, preventing null reference errors.
 - **Dashboard Recovery Calculation:** Updated dashboard stats to calculate recovery percentage globally across all invoices (not just current month), providing accurate overall collection performance metrics.
 - **Invoice Status Logic:** Automatic status calculation based on payment amounts: 'paid' (fully paid), 'partial' (partially paid), 'issued' (unpaid).
+- **Overdue Status Preservation (October 9, 2025):** Fixed critical bug where overdue invoices with partial payments were incorrectly marked as 'partial' instead of 'overdue', causing them to disappear from insurer reports. Updated `recalculateInvoicePayments()` to check due date: overdue invoices now maintain 'overdue' status regardless of partial payments (only fully paid invoices change to 'paid'). This ensures insurer reports correctly include all past-due invoices.
 
 ## System Architecture
 

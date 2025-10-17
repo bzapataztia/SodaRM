@@ -284,23 +284,8 @@ export class DatabaseStorage implements IStorage {
     
     const [newPayment] = await db.insert(payments).values(payment).returning();
     
-    // Recalculate invoice amount paid and status
-    const newAmountPaid = parseFloat(invoice.amountPaid) + parseFloat(payment.amount.toString());
-    const total = parseFloat(invoice.totalAmount);
-    
-    let newStatus: any = 'partial';
-    if (newAmountPaid >= total) {
-      newStatus = 'paid';
-    } else if (newAmountPaid <= 0) {
-      newStatus = 'issued';
-    }
-    
-    await db.update(invoices)
-      .set({ 
-        amountPaid: newAmountPaid.toFixed(2),
-        status: newStatus,
-      })
-      .where(and(eq(invoices.id, payment.invoiceId), eq(invoices.tenantId, payment.tenantId)));
+    // Recalculate invoice amount paid and status using shared logic
+    await this.recalculateInvoicePayments(payment.invoiceId, payment.tenantId);
     
     return newPayment;
   }
@@ -491,11 +476,21 @@ export class DatabaseStorage implements IStorage {
     const totalPaid = invoicePayments.reduce((sum, p) => sum + parseFloat(p.amount.toString()), 0);
     const total = parseFloat(invoice.totalAmount);
     
+    // Check if invoice is overdue
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const dueDate = new Date(invoice.dueDate);
+    const isOverdue = dueDate < today;
+    
     let newStatus: any = 'issued';
     if (totalPaid >= total) {
       newStatus = 'paid';
     } else if (totalPaid > 0) {
-      newStatus = 'partial';
+      // If invoice is overdue and has partial payment, keep it as overdue
+      newStatus = isOverdue ? 'overdue' : 'partial';
+    } else {
+      // If invoice is overdue and has no payment, mark as overdue
+      newStatus = isOverdue ? 'overdue' : 'issued';
     }
     
     await db.update(invoices)
