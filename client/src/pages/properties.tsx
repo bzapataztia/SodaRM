@@ -321,6 +321,7 @@ function PhotoGalleryDialog({
 }) {
   const { toast } = useToast();
   const [isUploading, setIsUploading] = useState(false);
+  const [selectedPhotoIndex, setSelectedPhotoIndex] = useState<number | null>(null);
 
   const { data: photos = [], isLoading } = useQuery<PropertyPhoto[]>({
     queryKey: ['/api/properties', property?.id, 'photos'],
@@ -332,42 +333,21 @@ function PhotoGalleryDialog({
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/properties', property?.id, 'photos'] });
       toast({ title: 'Foto eliminada exitosamente' });
+      setSelectedPhotoIndex(null);
     },
     onError: () => {
       toast({ title: 'Error al eliminar foto', variant: 'destructive' });
     },
   });
 
-  const reorderMutation = useMutation({
-    mutationFn: (photoOrders: { id: string; displayOrder: number }[]) => 
-      apiRequest('PATCH', '/api/property-photos/reorder', { photoOrders }),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['/api/properties', property?.id, 'photos'] });
-      queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
-      toast({ title: 'Orden actualizado exitosamente' });
-    },
-    onError: () => {
-      toast({ title: 'Error al reordenar fotos', variant: 'destructive' });
-    },
-  });
-
-  const movePhoto = (photoId: string, direction: 'left' | 'right') => {
-    const currentIndex = photos.findIndex(p => p.id === photoId);
-    if (currentIndex === -1) return;
-
-    const newIndex = direction === 'left' ? currentIndex - 1 : currentIndex + 1;
-    if (newIndex < 0 || newIndex >= photos.length) return;
-
-    const reorderedPhotos = [...photos];
-    [reorderedPhotos[currentIndex], reorderedPhotos[newIndex]] = 
-      [reorderedPhotos[newIndex], reorderedPhotos[currentIndex]];
-
-    const photoOrders = reorderedPhotos.map((photo, index) => ({
-      id: photo.id,
-      displayOrder: index,
-    }));
-
-    reorderMutation.mutate(photoOrders);
+  const navigatePhoto = (direction: 'prev' | 'next') => {
+    if (selectedPhotoIndex === null) return;
+    
+    if (direction === 'prev' && selectedPhotoIndex > 0) {
+      setSelectedPhotoIndex(selectedPhotoIndex - 1);
+    } else if (direction === 'next' && selectedPhotoIndex < photos.length - 1) {
+      setSelectedPhotoIndex(selectedPhotoIndex + 1);
+    }
   };
 
   const handleUploadComplete = async (objectPath: string) => {
@@ -483,7 +463,11 @@ function PhotoGalleryDialog({
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
                 {photos.map((photo, index) => (
                   <div key={photo.id} className="relative group">
-                    <div className="relative overflow-hidden rounded-xl border-2 border-border hover:border-primary/50 transition-all">
+                    <div 
+                      className="relative overflow-hidden rounded-xl border-2 border-border hover:border-primary/50 transition-all cursor-pointer"
+                      onClick={() => setSelectedPhotoIndex(index)}
+                      data-testid={`photo-thumbnail-${photo.id}`}
+                    >
                       <img 
                         src={photo.objectPath} 
                         alt={photo.caption || `Foto ${index + 1}`} 
@@ -497,35 +481,16 @@ function PhotoGalleryDialog({
                         </div>
                       )}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity">
-                        <div className="absolute top-3 left-3 right-3 flex items-center justify-center gap-2">
-                          <Button
-                            variant="secondary"
-                            size="icon"
-                            className="h-8 w-8 shadow-lg bg-white/90 hover:bg-white dark:bg-gray-800/90 dark:hover:bg-gray-800"
-                            onClick={() => movePhoto(photo.id, 'left')}
-                            disabled={index === 0 || reorderMutation.isPending}
-                            data-testid={`button-move-left-${photo.id}`}
-                          >
-                            <ChevronLeft className="w-4 h-4" />
-                          </Button>
-                          <Button
-                            variant="secondary"
-                            size="icon"
-                            className="h-8 w-8 shadow-lg bg-white/90 hover:bg-white dark:bg-gray-800/90 dark:hover:bg-gray-800"
-                            onClick={() => movePhoto(photo.id, 'right')}
-                            disabled={index === photos.length - 1 || reorderMutation.isPending}
-                            data-testid={`button-move-right-${photo.id}`}
-                          >
-                            <ChevronRight className="w-4 h-4" />
-                          </Button>
-                        </div>
                         <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
                           <span className="text-white text-sm font-medium">Foto {index + 1}</span>
                           <Button
                             variant="destructive"
                             size="sm"
                             className="shadow-lg"
-                            onClick={() => deleteMutation.mutate(photo.id)}
+                            onClick={(e) => {
+                              e.stopPropagation();
+                              deleteMutation.mutate(photo.id);
+                            }}
                             disabled={deleteMutation.isPending}
                             data-testid={`button-delete-photo-${photo.id}`}
                           >
@@ -541,6 +506,65 @@ function PhotoGalleryDialog({
           </div>
         </div>
       </DialogContent>
+
+      {/* Modal de visualización de foto */}
+      {selectedPhotoIndex !== null && photos[selectedPhotoIndex] && (
+        <Dialog open={true} onOpenChange={() => setSelectedPhotoIndex(null)}>
+          <DialogContent className="max-w-7xl max-h-[95vh] p-0 bg-black/95 border-0">
+            <div className="relative w-full h-[90vh] flex items-center justify-center">
+              {/* Foto principal */}
+              <img 
+                src={photos[selectedPhotoIndex].objectPath}
+                alt={photos[selectedPhotoIndex].caption || `Foto ${selectedPhotoIndex + 1}`}
+                className="max-w-full max-h-full object-contain"
+                data-testid="photo-viewer-image"
+              />
+
+              {/* Botón cerrar */}
+              <Button
+                variant="ghost"
+                size="icon"
+                className="absolute top-4 right-4 h-10 w-10 rounded-full bg-white/10 hover:bg-white/20 text-white"
+                onClick={() => setSelectedPhotoIndex(null)}
+                data-testid="button-close-viewer"
+              >
+                <X className="h-5 w-5" />
+              </Button>
+
+              {/* Flecha izquierda */}
+              {selectedPhotoIndex > 0 && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute left-4 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white"
+                  onClick={() => navigatePhoto('prev')}
+                  data-testid="button-prev-photo"
+                >
+                  <ChevronLeft className="h-6 w-6" />
+                </Button>
+              )}
+
+              {/* Flecha derecha */}
+              {selectedPhotoIndex < photos.length - 1 && (
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="absolute right-4 top-1/2 -translate-y-1/2 h-12 w-12 rounded-full bg-white/10 hover:bg-white/20 text-white"
+                  onClick={() => navigatePhoto('next')}
+                  data-testid="button-next-photo"
+                >
+                  <ChevronRight className="h-6 w-6" />
+                </Button>
+              )}
+
+              {/* Contador de fotos */}
+              <div className="absolute bottom-4 left-1/2 -translate-x-1/2 bg-black/60 text-white px-4 py-2 rounded-full text-sm">
+                {selectedPhotoIndex + 1} / {photos.length}
+              </div>
+            </div>
+          </DialogContent>
+        </Dialog>
+      )}
     </Dialog>
   );
 }
