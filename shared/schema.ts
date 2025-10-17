@@ -208,6 +208,7 @@ export const propertyPhotos = pgTable("property_photos", {
   propertyId: varchar("property_id").notNull().references(() => properties.id, { onDelete: "cascade" }),
   objectPath: text("object_path").notNull(),
   caption: text("caption"),
+  displayOrder: integer("display_order").notNull().default(0),
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 

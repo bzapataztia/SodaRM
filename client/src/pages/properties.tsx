@@ -13,7 +13,7 @@ import { insertPropertySchema, type Property, type Contact } from '@shared/schem
 import { z } from 'zod';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Pencil, Trash2, Download, Upload, X, Image } from 'lucide-react';
+import { Plus, Pencil, Trash2, Download, Upload, X, Image, ChevronLeft, ChevronRight } from 'lucide-react';
 import { ObjectUploader } from '@/components/ObjectUploader';
 import type { PropertyPhoto } from '@shared/schema';
 import {
@@ -338,6 +338,38 @@ function PhotoGalleryDialog({
     },
   });
 
+  const reorderMutation = useMutation({
+    mutationFn: (photoOrders: { id: string; displayOrder: number }[]) => 
+      apiRequest('PATCH', '/api/property-photos/reorder', { photoOrders }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/properties', property?.id, 'photos'] });
+      queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
+      toast({ title: 'Orden actualizado exitosamente' });
+    },
+    onError: () => {
+      toast({ title: 'Error al reordenar fotos', variant: 'destructive' });
+    },
+  });
+
+  const movePhoto = (photoId: string, direction: 'left' | 'right') => {
+    const currentIndex = photos.findIndex(p => p.id === photoId);
+    if (currentIndex === -1) return;
+
+    const newIndex = direction === 'left' ? currentIndex - 1 : currentIndex + 1;
+    if (newIndex < 0 || newIndex >= photos.length) return;
+
+    const reorderedPhotos = [...photos];
+    [reorderedPhotos[currentIndex], reorderedPhotos[newIndex]] = 
+      [reorderedPhotos[newIndex], reorderedPhotos[currentIndex]];
+
+    const photoOrders = reorderedPhotos.map((photo, index) => ({
+      id: photo.id,
+      displayOrder: index,
+    }));
+
+    reorderMutation.mutate(photoOrders);
+  };
+
   const handleUploadComplete = async (objectPath: string) => {
     try {
       setIsUploading(true);
@@ -362,10 +394,22 @@ function PhotoGalleryDialog({
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader className="pb-4">
-          <DialogTitle className="text-2xl font-bold">Fotos de {property?.name}</DialogTitle>
-          <p className="text-sm text-muted-foreground mt-1">
-            {photos.length} de 10 fotos • Máximo 2MB por imagen
-          </p>
+          <div className="flex items-start justify-between">
+            <div>
+              <DialogTitle className="text-2xl font-bold">Fotos de {property?.name}</DialogTitle>
+              <p className="text-sm text-muted-foreground mt-1">
+                {photos.length} de 10 fotos • Máximo 2MB por imagen
+              </p>
+            </div>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-8 w-8 rounded-full"
+              onClick={() => onOpenChange(false)}
+            >
+              <X className="h-4 w-4" />
+            </Button>
+          </div>
         </DialogHeader>
         
         <div className="flex-1 overflow-y-auto space-y-6 pr-2">
@@ -453,6 +497,28 @@ function PhotoGalleryDialog({
                         </div>
                       )}
                       <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="absolute top-3 left-3 right-3 flex items-center justify-center gap-2">
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            className="h-8 w-8 shadow-lg bg-white/90 hover:bg-white dark:bg-gray-800/90 dark:hover:bg-gray-800"
+                            onClick={() => movePhoto(photo.id, 'left')}
+                            disabled={index === 0 || reorderMutation.isPending}
+                            data-testid={`button-move-left-${photo.id}`}
+                          >
+                            <ChevronLeft className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            variant="secondary"
+                            size="icon"
+                            className="h-8 w-8 shadow-lg bg-white/90 hover:bg-white dark:bg-gray-800/90 dark:hover:bg-gray-800"
+                            onClick={() => movePhoto(photo.id, 'right')}
+                            disabled={index === photos.length - 1 || reorderMutation.isPending}
+                            data-testid={`button-move-right-${photo.id}`}
+                          >
+                            <ChevronRight className="w-4 h-4" />
+                          </Button>
+                        </div>
                         <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
                           <span className="text-white text-sm font-medium">Foto {index + 1}</span>
                           <Button
@@ -461,6 +527,7 @@ function PhotoGalleryDialog({
                             className="shadow-lg"
                             onClick={() => deleteMutation.mutate(photo.id)}
                             disabled={deleteMutation.isPending}
+                            data-testid={`button-delete-photo-${photo.id}`}
                           >
                             <Trash2 className="w-4 h-4" />
                           </Button>

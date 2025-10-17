@@ -81,6 +81,7 @@ export interface IStorage {
   getPropertyPhotos(propertyId: string, tenantId: string): Promise<PropertyPhoto[]>;
   createPropertyPhoto(photo: InsertPropertyPhoto): Promise<PropertyPhoto>;
   deletePropertyPhoto(id: string, tenantId: string): Promise<void>;
+  updatePhotoOrder(photoId: string, newOrder: number, tenantId: string): Promise<void>;
   getPropertyPhotosCount(propertyId: string, tenantId: string): Promise<number>;
 }
 
@@ -583,18 +584,34 @@ export class DatabaseStorage implements IStorage {
   async getPropertyPhotos(propertyId: string, tenantId: string): Promise<PropertyPhoto[]> {
     return await db.query.propertyPhotos.findMany({
       where: and(eq(propertyPhotos.propertyId, propertyId), eq(propertyPhotos.tenantId, tenantId)),
-      orderBy: [desc(propertyPhotos.createdAt)],
+      orderBy: [propertyPhotos.displayOrder, propertyPhotos.createdAt],
     });
   }
 
   async createPropertyPhoto(photo: InsertPropertyPhoto): Promise<PropertyPhoto> {
-    const [newPhoto] = await db.insert(propertyPhotos).values(photo).returning();
+    // Get the max display order for this property
+    const result = await db.select({ maxOrder: sql<number>`COALESCE(MAX(display_order), -1)` })
+      .from(propertyPhotos)
+      .where(and(eq(propertyPhotos.propertyId, photo.propertyId), eq(propertyPhotos.tenantId, photo.tenantId)));
+    
+    const nextOrder = (result[0]?.maxOrder ?? -1) + 1;
+    
+    const [newPhoto] = await db.insert(propertyPhotos).values({
+      ...photo,
+      displayOrder: nextOrder,
+    }).returning();
     return newPhoto;
   }
 
   async deletePropertyPhoto(id: string, tenantId: string): Promise<void> {
     await db.delete(propertyPhotos)
       .where(and(eq(propertyPhotos.id, id), eq(propertyPhotos.tenantId, tenantId)));
+  }
+
+  async updatePhotoOrder(photoId: string, newOrder: number, tenantId: string): Promise<void> {
+    await db.update(propertyPhotos)
+      .set({ displayOrder: newOrder })
+      .where(and(eq(propertyPhotos.id, photoId), eq(propertyPhotos.tenantId, tenantId)));
   }
 
   async getPropertyPhotosCount(propertyId: string, tenantId: string): Promise<number> {

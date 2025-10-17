@@ -1460,6 +1460,25 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  app.patch("/api/property-photos/reorder", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
+    
+    try {
+      const { photoOrders } = req.body as { photoOrders: { id: string; displayOrder: number }[] };
+      
+      // Update each photo's order
+      for (const { id, displayOrder } of photoOrders) {
+        await storage.updatePhotoOrder(id, displayOrder, req.tenantId);
+      }
+
+      res.status(200).json({ message: 'Orden actualizado exitosamente' });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
+    }
+  });
+
   // Serve object files
   app.get("/objects/*", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
     try {
