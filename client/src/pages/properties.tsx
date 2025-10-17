@@ -432,27 +432,163 @@ function PhotoGalleryDialog({
   );
 }
 
-export default function PropertiesPage() {
-  const { data: properties = [], isLoading } = useQuery<Property[]>({
-    queryKey: ['/api/properties'],
+function PropertyCard({ property }: { property: Property }) {
+  const { data: photos = [] } = useQuery<PropertyPhoto[]>({
+    queryKey: ['/api/properties', property.id, 'photos'],
   });
+
+  const firstPhoto = photos[0];
+
+  return (
+    <div 
+      className="bg-card border border-border rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
+      data-testid={`card-property-${property.id}`}
+    >
+      <div className="relative h-48 bg-gradient-to-br from-blue-100 to-blue-200 dark:from-blue-900 dark:to-blue-800">
+        {firstPhoto && (
+          <img 
+            src={firstPhoto.objectPath} 
+            alt={property.name}
+            className="absolute inset-0 w-full h-full object-cover"
+          />
+        )}
+        <div className="absolute top-3 right-3">
+          <span
+            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+              property.status === 'rented'
+                ? 'bg-success text-success-foreground'
+                : property.status === 'available'
+                ? 'bg-primary text-primary-foreground'
+                : 'bg-warning text-warning-foreground'
+            }`}
+          >
+            {property.status === 'rented'
+              ? 'Arrendada'
+              : property.status === 'available'
+              ? 'Disponible'
+              : property.status}
+          </span>
+        </div>
+        <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
+          <span className="bg-white/90 backdrop-blur px-3 py-1 rounded-full text-sm font-semibold">
+            {property.code}
+          </span>
+        </div>
+      </div>
+      <PropertyCardContent property={property} />
+    </div>
+  );
+}
+
+function PropertyCardContent({ property }: { property: Property }) {
+  const [photoGalleryOpen, setPhotoGalleryOpen] = useState(false);
+  const [editingProperty, setEditingProperty] = useState(false);
+  const [deleteProperty, setDeleteProperty] = useState(false);
   const { toast } = useToast();
-  const [editingProperty, setEditingProperty] = useState<Property | undefined>();
-  const [isCreateOpen, setIsCreateOpen] = useState(false);
-  const [deleteProperty, setDeleteProperty] = useState<Property | undefined>();
-  const [photoGalleryProperty, setPhotoGalleryProperty] = useState<Property | undefined>();
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiRequest('DELETE', `/api/properties/${id}`),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['/api/properties'] });
       toast({ title: 'Propiedad eliminada exitosamente' });
-      setDeleteProperty(undefined);
+      setDeleteProperty(false);
     },
     onError: () => {
       toast({ title: 'Error al eliminar propiedad', variant: 'destructive' });
     },
   });
+
+  return (
+    <>
+      <div className="p-6">
+        <h3 className="font-semibold text-lg mb-1" data-testid={`text-name-${property.id}`}>{property.name}</h3>
+        <p className="text-sm text-muted-foreground mb-3">{property.address}</p>
+        <div className="space-y-2 mb-4">
+          <div className="flex justify-between text-sm">
+            <span className="text-muted-foreground">Canon mensual</span>
+            <span className="font-semibold">
+              ${parseFloat(property.listRent || '0').toLocaleString('es-CO')}
+            </span>
+          </div>
+        </div>
+        <div className="flex items-center justify-end gap-2 pt-2 border-t">
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => setPhotoGalleryOpen(true)}
+            data-testid={`button-photos-${property.id}`}
+          >
+            <Image className="w-4 h-4 mr-1" />
+            Fotos
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => setEditingProperty(true)}
+            data-testid={`button-edit-${property.id}`}
+          >
+            <Pencil className="w-4 h-4 mr-1" />
+            Editar
+          </Button>
+          <Button 
+            variant="ghost" 
+            size="sm"
+            onClick={() => setDeleteProperty(true)}
+            data-testid={`button-delete-${property.id}`}
+          >
+            <Trash2 className="w-4 h-4 mr-1" />
+            Eliminar
+          </Button>
+        </div>
+      </div>
+
+      {photoGalleryOpen && (
+        <PhotoGalleryDialog 
+          property={property}
+          open={photoGalleryOpen} 
+          onOpenChange={setPhotoGalleryOpen}
+        />
+      )}
+
+      {editingProperty && (
+        <PropertyFormDialog 
+          property={property}
+          open={editingProperty} 
+          onOpenChange={setEditingProperty}
+        />
+      )}
+
+      <AlertDialog open={deleteProperty} onOpenChange={setDeleteProperty}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta acción no se puede deshacer. Se eliminará permanentemente la propiedad{' '}
+              <strong>{property.name}</strong>.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel data-testid="button-cancel-delete">Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => deleteMutation.mutate(property.id)}
+              disabled={deleteMutation.isPending}
+              data-testid="button-confirm-delete"
+            >
+              {deleteMutation.isPending ? 'Eliminando...' : 'Eliminar'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </>
+  );
+}
+
+export default function PropertiesPage() {
+  const { data: properties = [], isLoading } = useQuery<Property[]>({
+    queryKey: ['/api/properties'],
+  });
+  const { toast } = useToast();
+  const [isCreateOpen, setIsCreateOpen] = useState(false);
 
   const importMutation = useMutation({
     mutationFn: async (file: File) => {
@@ -543,77 +679,7 @@ export default function PropertiesPage() {
                 </div>
               ) : (
                 properties.map((property) => (
-                  <div 
-                    key={property.id} 
-                    className="bg-card border border-border rounded-lg overflow-hidden hover:shadow-lg transition-shadow"
-                    data-testid={`card-property-${property.id}`}
-                  >
-                    <div className="relative h-48 bg-gradient-to-br from-blue-100 to-blue-200">
-                      <div className="absolute top-3 right-3">
-                        <span
-                          className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                            property.status === 'rented'
-                              ? 'bg-success text-success-foreground'
-                              : property.status === 'available'
-                              ? 'bg-primary text-primary-foreground'
-                              : 'bg-warning text-warning-foreground'
-                          }`}
-                        >
-                          {property.status === 'rented'
-                            ? 'Arrendada'
-                            : property.status === 'available'
-                            ? 'Disponible'
-                            : property.status}
-                        </span>
-                      </div>
-                      <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
-                        <span className="bg-white/90 backdrop-blur px-3 py-1 rounded-full text-sm font-semibold">
-                          {property.code}
-                        </span>
-                      </div>
-                    </div>
-                    <div className="p-6">
-                      <h3 className="font-semibold text-lg mb-1" data-testid={`text-name-${property.id}`}>{property.name}</h3>
-                      <p className="text-sm text-muted-foreground mb-3">{property.address}</p>
-                      <div className="space-y-2 mb-4">
-                        <div className="flex justify-between text-sm">
-                          <span className="text-muted-foreground">Canon mensual</span>
-                          <span className="font-semibold">
-                            ${parseFloat(property.listRent || '0').toLocaleString('es-CO')}
-                          </span>
-                        </div>
-                      </div>
-                      <div className="flex items-center justify-end gap-2 pt-2 border-t">
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => setPhotoGalleryProperty(property)}
-                          data-testid={`button-photos-${property.id}`}
-                        >
-                          <Image className="w-4 h-4 mr-1" />
-                          Fotos
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => setEditingProperty(property)}
-                          data-testid={`button-edit-${property.id}`}
-                        >
-                          <Pencil className="w-4 h-4 mr-1" />
-                          Editar
-                        </Button>
-                        <Button 
-                          variant="ghost" 
-                          size="sm"
-                          onClick={() => setDeleteProperty(property)}
-                          data-testid={`button-delete-${property.id}`}
-                        >
-                          <Trash2 className="w-4 h-4 mr-1" />
-                          Eliminar
-                        </Button>
-                      </div>
-                    </div>
-                  </div>
+                  <PropertyCard key={property.id} property={property} />
                 ))
               )}
             </div>
@@ -625,44 +691,6 @@ export default function PropertiesPage() {
         open={isCreateOpen} 
         onOpenChange={setIsCreateOpen}
       />
-
-      {editingProperty && (
-        <PropertyFormDialog 
-          property={editingProperty}
-          open={!!editingProperty} 
-          onOpenChange={(open) => !open && setEditingProperty(undefined)}
-        />
-      )}
-
-      <AlertDialog open={!!deleteProperty} onOpenChange={() => setDeleteProperty(undefined)}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <AlertDialogTitle>¿Estás seguro?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta acción no se puede deshacer. Se eliminará permanentemente la propiedad{' '}
-              <strong>{deleteProperty?.name}</strong>.
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel data-testid="button-cancel-delete">Cancelar</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={() => deleteProperty && deleteMutation.mutate(deleteProperty.id)}
-              disabled={deleteMutation.isPending}
-              data-testid="button-confirm-delete"
-            >
-              {deleteMutation.isPending ? 'Eliminando...' : 'Eliminar'}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
-
-      {photoGalleryProperty && (
-        <PhotoGalleryDialog 
-          property={photoGalleryProperty}
-          open={!!photoGalleryProperty} 
-          onOpenChange={(open) => !open && setPhotoGalleryProperty(undefined)}
-        />
-      )}
     </div>
   );
 }
