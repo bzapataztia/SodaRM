@@ -3,9 +3,6 @@ import Uppy from "@uppy/core";
 import { Dashboard } from "@uppy/react";
 import AwsS3 from "@uppy/aws-s3";
 
-import "@uppy/core/dist/style.min.css";
-import "@uppy/dashboard/dist/style.min.css";
-
 interface ObjectUploaderProps {
   onUploadComplete: (objectPath: string) => void;
   onUploadError?: (error: Error) => void;

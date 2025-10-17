@@ -13,7 +13,9 @@ import { insertPropertySchema, type Property, type Contact } from '@shared/schem
 import { z } from 'zod';
 import { apiRequest, queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
-import { Plus, Pencil, Trash2, Download, Upload, X } from 'lucide-react';
+import { Plus, Pencil, Trash2, Download, Upload, X, Image } from 'lucide-react';
+import { ObjectUploader } from '@/components/ObjectUploader';
+import type { PropertyPhoto } from '@shared/schema';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -308,6 +310,128 @@ function PropertyFormDialog({
   );
 }
 
+function PhotoGalleryDialog({ 
+  property, 
+  open, 
+  onOpenChange 
+}: { 
+  property?: Property; 
+  open: boolean; 
+  onOpenChange: (open: boolean) => void;
+}) {
+  const { toast } = useToast();
+  const [isUploading, setIsUploading] = useState(false);
+
+  const { data: photos = [], isLoading } = useQuery<PropertyPhoto[]>({
+    queryKey: ['/api/properties', property?.id, 'photos'],
+    enabled: !!property?.id,
+  });
+
+  const deleteMutation = useMutation({
+    mutationFn: (photoId: string) => apiRequest('DELETE', `/api/property-photos/${photoId}`),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['/api/properties', property?.id, 'photos'] });
+      toast({ title: 'Foto eliminada exitosamente' });
+    },
+    onError: () => {
+      toast({ title: 'Error al eliminar foto', variant: 'destructive' });
+    },
+  });
+
+  const handleUploadComplete = async (objectPath: string) => {
+    try {
+      setIsUploading(true);
+      await apiRequest('POST', `/api/properties/${property?.id}/photos`, {
+        objectPath,
+        caption: null,
+      });
+      
+      queryClient.invalidateQueries({ queryKey: ['/api/properties', property?.id, 'photos'] });
+      toast({ title: 'Foto subida exitosamente' });
+    } catch (error) {
+      toast({ 
+        title: error instanceof Error ? error.message : 'Error al subir foto', 
+        variant: 'destructive' 
+      });
+    } finally {
+      setIsUploading(false);
+    }
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
+        <DialogHeader>
+          <DialogTitle>Fotos de {property?.name}</DialogTitle>
+        </DialogHeader>
+        
+        <div className="space-y-6">
+          {photos.length < 10 && (
+            <div>
+              <h3 className="text-sm font-medium mb-3">Subir Nueva Foto</h3>
+              <ObjectUploader 
+                onUploadComplete={handleUploadComplete}
+                onUploadError={(error) => {
+                  toast({ title: 'Error al subir foto', description: error.message, variant: 'destructive' });
+                }}
+              />
+              {isUploading && (
+                <div className="mt-2 text-sm text-muted-foreground">Guardando...</div>
+              )}
+            </div>
+          )}
+
+          {photos.length >= 10 && (
+            <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-md p-3">
+              <p className="text-sm text-amber-800 dark:text-amber-200">
+                Se ha alcanzado el límite máximo de 10 fotos por propiedad
+              </p>
+            </div>
+          )}
+
+          <div>
+            <h3 className="text-sm font-medium mb-3">Galería ({photos.length}/10)</h3>
+            {isLoading ? (
+              <div className="flex justify-center py-8">
+                <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
+              </div>
+            ) : photos.length === 0 ? (
+              <div className="text-center py-8 text-muted-foreground">
+                <Image className="w-12 h-12 mx-auto mb-2 opacity-50" />
+                <p>No hay fotos</p>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                {photos.map((photo) => (
+                  <div key={photo.id} className="relative group">
+                    <img 
+                      src={photo.objectPath} 
+                      alt={photo.caption || 'Foto de propiedad'} 
+                      className="w-full h-48 object-cover rounded-lg"
+                    />
+                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all rounded-lg flex items-center justify-center">
+                      <Button
+                        variant="destructive"
+                        size="sm"
+                        className="opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => deleteMutation.mutate(photo.id)}
+                        disabled={deleteMutation.isPending}
+                      >
+                        <Trash2 className="w-4 h-4 mr-1" />
+                        Eliminar
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function PropertiesPage() {
   const { data: properties = [], isLoading } = useQuery<Property[]>({
     queryKey: ['/api/properties'],
@@ -316,6 +440,7 @@ export default function PropertiesPage() {
   const [editingProperty, setEditingProperty] = useState<Property | undefined>();
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [deleteProperty, setDeleteProperty] = useState<Property | undefined>();
+  const [photoGalleryProperty, setPhotoGalleryProperty] = useState<Property | undefined>();
 
   const deleteMutation = useMutation({
     mutationFn: (id: string) => apiRequest('DELETE', `/api/properties/${id}`),
@@ -462,6 +587,15 @@ export default function PropertiesPage() {
                         <Button 
                           variant="ghost" 
                           size="sm"
+                          onClick={() => setPhotoGalleryProperty(property)}
+                          data-testid={`button-photos-${property.id}`}
+                        >
+                          <Image className="w-4 h-4 mr-1" />
+                          Fotos
+                        </Button>
+                        <Button 
+                          variant="ghost" 
+                          size="sm"
                           onClick={() => setEditingProperty(property)}
                           data-testid={`button-edit-${property.id}`}
                         >
@@ -521,6 +655,14 @@ export default function PropertiesPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {photoGalleryProperty && (
+        <PhotoGalleryDialog 
+          property={photoGalleryProperty}
+          open={!!photoGalleryProperty} 
+          onOpenChange={(open) => !open && setPhotoGalleryProperty(undefined)}
+        />
+      )}
     </div>
   );
 }
