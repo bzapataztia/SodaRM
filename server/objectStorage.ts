@@ -1,5 +1,6 @@
 // Reference: blueprint:javascript_object_storage
 import { Storage, File } from "@google-cloud/storage";
+import type { CredentialBody } from "google-auth-library"
 import { Response } from "express";
 import { randomUUID } from "crypto";
 import {
@@ -10,25 +11,21 @@ import {
   setObjectAclPolicy,
 } from "./objectAcl";
 
-const REPLIT_SIDECAR_ENDPOINT = "http://127.0.0.1:1106";
+let parsedCredentials: CredentialBody | undefined;
+const credentialsJson = process.env.GOOGLE_APPLICATION_CREDENTIALS_JSON;
+
+if (credentialsJson) {
+  try {
+    parsedCredentials = JSON.parse(credentialsJson) as CredentialBody;
+  } catch (error) {
+    throw new Error("Invalid GOOGLE_APPLICATION_CREDENTIALS_JSON value: not valid JSON");
+  }
+}
 
 // The object storage client is used to interact with the object storage service.
 export const objectStorageClient = new Storage({
-  credentials: {
-    audience: "replit",
-    subject_token_type: "access_token",
-    token_url: `${REPLIT_SIDECAR_ENDPOINT}/token`,
-    type: "external_account",
-    credential_source: {
-      url: `${REPLIT_SIDECAR_ENDPOINT}/credential`,
-      format: {
-        type: "json",
-        subject_token_field_name: "access_token",
-      },
-    },
-    universe_domain: "googleapis.com",
-  },
-  projectId: "",
+   projectId: process.env.GOOGLE_CLOUD_PROJECT || process.env.GCP_PROJECT_ID,
+  credentials: parsedCredentials,
 });
 
 export class ObjectNotFoundError extends Error {
@@ -56,8 +53,8 @@ export class ObjectStorageService {
     );
     if (paths.length === 0) {
       throw new Error(
-        "PUBLIC_OBJECT_SEARCH_PATHS not set. Create a bucket in 'Object Storage' " +
-          "tool and set PUBLIC_OBJECT_SEARCH_PATHS env var (comma-separated paths)."
+         "PUBLIC_OBJECT_SEARCH_PATHS not set. Configure a Google Cloud Storage bucket " +
+          "and provide comma-separated paths in the PUBLIC_OBJECT_SEARCH_PATHS env var."
       );
     }
     return paths;
@@ -134,12 +131,6 @@ export class ObjectStorageService {
   // Gets the upload URL for an object entity.
   async getObjectEntityUploadURL(): Promise<string> {
     const privateObjectDir = this.getPrivateObjectDir();
-    if (!privateObjectDir) {
-      throw new Error(
-        "PRIVATE_OBJECT_DIR not set. Create a bucket in 'Object Storage' " +
-          "tool and set PRIVATE_OBJECT_DIR env var."
-      );
-    }
 
     const objectId = randomUUID();
     const fullPath = `${privateObjectDir}/uploads/${objectId}`;
@@ -278,29 +269,23 @@ async function signObjectURL({
   method: "GET" | "PUT" | "DELETE" | "HEAD";
   ttlSec: number;
 }): Promise<string> {
-  const request = {
-    bucket_name: bucketName,
-    object_name: objectName,
-    method,
-    expires_at: new Date(Date.now() + ttlSec * 1000).toISOString(),
-  };
-  const response = await fetch(
-    `${REPLIT_SIDECAR_ENDPOINT}/object-storage/signed-object-url`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify(request),
-    }
-  );
-  if (!response.ok) {
-    throw new Error(
-      `Failed to sign object URL, errorcode: ${response.status}, ` +
-        `make sure you're running on Replit`
-    );
+  const action =
+    method === "GET" || method === "HEAD"
+      ? "read"
+      : method === "PUT"
+      ? "write"
+      : method === "DELETE"
+      ? "delete"
+      : undefined;
+
+  if (!action) {
+    throw new Error(`Unsupported HTTP method for signing object URL: ${method}`);
   }
 
-  const { signed_url: signedURL } = await response.json();
+  const expires = Date.now() + ttlSec * 1000;
+  const [signedURL] = await objectStorageClient
+    .bucket(bucketName)
+    .file(objectName)
+    .getSignedUrl({ action, expires });
   return signedURL;
 }
