@@ -1,7 +1,6 @@
-import { useState, useEffect } from "react";
-import Uppy from "@uppy/core";
-import { Dashboard } from "@uppy/react";
-import AwsS3 from "@uppy/aws-s3";
+import { useState, useRef } from "react";
+import { Button } from "@/components/ui/button";
+import { Upload } from "lucide-react";
 
 interface ObjectUploaderProps {
   onUploadComplete: (objectPath: string) => void;
@@ -18,96 +17,138 @@ export function ObjectUploader({
   allowedFileTypes = ["image/jpeg", "image/jpg", "image/png", "image/webp"],
   note = "Máximo 2MB por imagen. Formatos: JPG, PNG, WebP",
 }: ObjectUploaderProps) {
-  const [uppy] = useState(() =>
-    new Uppy({
-      restrictions: {
-        maxFileSize,
-        allowedFileTypes,
-        maxNumberOfFiles: 1,
-      },
-      autoProceed: false,
-    }).use(AwsS3, {
-      async getUploadParameters(file) {
-        const response = await fetch("/api/object-storage/upload-url", {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-          },
-          body: JSON.stringify({
-            filename: file.name,
-            contentType: file.type,
-          }),
-        });
+  const [isUploading, setIsUploading] = useState(false);
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
-        if (!response.ok) {
-          throw new Error("Failed to get upload URL");
-        }
+  const handleFileSelect = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
 
-        const { url, method, headers } = await response.json();
+    // Validate file type
+    if (!allowedFileTypes.includes(file.type)) {
+      const error = new Error(`Tipo de archivo no permitido. Use: ${allowedFileTypes.join(", ")}`);
+      if (onUploadError) onUploadError(error);
+      return;
+    }
 
-        return {
-          method,
-          url,
-          headers,
-        };
-      },
-    })
-  );
+    // Validate file size
+    if (file.size > maxFileSize) {
+      const error = new Error(`Archivo muy grande. Máximo ${maxFileSize / (1024 * 1024)}MB`);
+      if (onUploadError) onUploadError(error);
+      return;
+    }
 
-  useEffect(() => {
-    const handleComplete = (result: any) => {
-      if (result.successful && result.successful.length > 0) {
-        const uploadedFile = result.successful[0];
-        const uploadUrl = uploadedFile.uploadURL;
-        
-        if (uploadUrl) {
-          // Normalize the path to /objects/... format
-          fetch("/api/object-storage/normalize-path", {
-            method: "POST",
-            headers: {
-              "Content-Type": "application/json",
-            },
-            body: JSON.stringify({ rawPath: uploadUrl }),
-          })
-            .then((res) => res.json())
-            .then((data) => {
-              onUploadComplete(data.normalizedPath);
-              uppy.cancelAll();
-            })
-            .catch((error) => {
-              console.error("Error normalizing path:", error);
-              if (onUploadError) {
-                onUploadError(error);
-              }
-            });
-        }
+    setSelectedFile(file);
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile) return;
+
+    try {
+      setIsUploading(true);
+
+      // Get upload URL
+      const uploadUrlResponse = await fetch("/api/object-storage/upload-url", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          filename: selectedFile.name,
+          contentType: selectedFile.type,
+        }),
+      });
+
+      if (!uploadUrlResponse.ok) {
+        throw new Error("Error al obtener URL de subida");
       }
-    };
 
-    const handleError = (error: Error) => {
+      const { url } = await uploadUrlResponse.json();
+
+      // Upload file to storage
+      const uploadResponse = await fetch(url, {
+        method: "PUT",
+        body: selectedFile,
+        headers: {
+          "Content-Type": selectedFile.type,
+        },
+      });
+
+      if (!uploadResponse.ok) {
+        throw new Error("Error al subir archivo");
+      }
+
+      // Normalize path
+      const normalizeResponse = await fetch("/api/object-storage/normalize-path", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ rawPath: url }),
+      });
+
+      if (!normalizeResponse.ok) {
+        throw new Error("Error al procesar ruta");
+      }
+
+      const { normalizedPath } = await normalizeResponse.json();
+      
+      onUploadComplete(normalizedPath);
+      setSelectedFile(null);
+      if (fileInputRef.current) {
+        fileInputRef.current.value = "";
+      }
+    } catch (error) {
       console.error("Upload error:", error);
-      if (onUploadError) {
+      if (onUploadError && error instanceof Error) {
         onUploadError(error);
       }
-    };
-
-    uppy.on("complete", handleComplete);
-    uppy.on("error", handleError);
-
-    return () => {
-      uppy.off("complete", handleComplete);
-      uppy.off("error", handleError);
-    };
-  }, [uppy, onUploadComplete, onUploadError]);
+    } finally {
+      setIsUploading(false);
+    }
+  };
 
   return (
-    <div className="object-uploader">
-      <Dashboard
-        uppy={uppy}
-        proudlyDisplayPoweredByUppy={false}
-        note={note}
-        height={350}
-      />
+    <div className="space-y-4">
+      <div className="border-2 border-dashed rounded-lg p-6 text-center">
+        <input
+          ref={fileInputRef}
+          type="file"
+          accept={allowedFileTypes.join(",")}
+          onChange={handleFileSelect}
+          className="hidden"
+          id="photo-upload"
+        />
+        <label
+          htmlFor="photo-upload"
+          className="cursor-pointer flex flex-col items-center gap-2"
+        >
+          <Upload className="w-12 h-12 text-muted-foreground" />
+          <div className="text-sm text-muted-foreground">
+            <span className="text-primary font-medium">Haz clic para seleccionar</span> o arrastra una imagen
+          </div>
+          <div className="text-xs text-muted-foreground">{note}</div>
+        </label>
+      </div>
+
+      {selectedFile && (
+        <div className="flex items-center justify-between bg-muted p-3 rounded-lg">
+          <div className="text-sm truncate flex-1">
+            <div className="font-medium">{selectedFile.name}</div>
+            <div className="text-muted-foreground">
+              {(selectedFile.size / 1024).toFixed(1)} KB
+            </div>
+          </div>
+          <Button
+            onClick={handleUpload}
+            disabled={isUploading}
+            size="sm"
+          >
+            {isUploading ? "Subiendo..." : "Subir"}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

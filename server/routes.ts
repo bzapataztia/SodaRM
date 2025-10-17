@@ -1363,7 +1363,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   const { ObjectStorageService } = await import("./objectStorage");
   const objectStorageService = new ObjectStorageService();
 
-  app.post("/api/object-storage/upload-url", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.post("/api/object-storage/upload-url", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
     try {
       const uploadUrl = await objectStorageService.getObjectEntityUploadURL();
       res.json({ 
@@ -1376,10 +1376,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/object-storage/normalize-path", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.post("/api/object-storage/normalize-path", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
     try {
       const { rawPath } = req.body;
-      const normalizedPath = objectStorageService.normalizeObjectEntityPath(rawPath);
+      const normalizedPath = objectStorageService.normalizeObjectEntityPath(rawPath as string);
       res.json({ normalizedPath });
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
@@ -1387,7 +1387,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Property Photos endpoints
-  app.get("/api/properties/:id/photos", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.get("/api/properties/:id/photos", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
+    
     try {
       const photos = await storage.getPropertyPhotos(req.params.id, req.tenantId);
       res.json(photos);
@@ -1396,7 +1400,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/properties/:id/photos", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.post("/api/properties/:id/photos", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
+    
     try {
       const { objectPath, caption } = req.body;
       
@@ -1406,20 +1414,19 @@ export async function registerRoutes(app: Express): Promise<Server> {
         return res.status(400).json({ message: 'Máximo 10 fotos por propiedad' });
       }
 
-      // Set ACL policy for the uploaded object
-      const { ObjectAclPolicy, ObjectPermission } = await import("./objectAcl");
-      const aclPolicy: typeof ObjectAclPolicy.prototype = {
-        owner: req.user!.id,
+      // Set ACL policy for the uploaded object (make it public)
+      const aclPolicy: any = {
+        owner: req.dbUser!.id,
         visibility: 'public',
       };
       
-      const normalizedPath = await objectStorageService.trySetObjectEntityAclPolicy(objectPath, aclPolicy);
+      const normalizedPath = await objectStorageService.trySetObjectEntityAclPolicy(objectPath as string, aclPolicy);
 
       const photo = await storage.createPropertyPhoto({
         tenantId: req.tenantId,
         propertyId: req.params.id,
         objectPath: normalizedPath,
-        caption: caption || null,
+        caption: (caption && typeof caption === 'string') ? caption : null,
       });
 
       res.status(201).json(photo);
@@ -1428,7 +1435,11 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/property-photos/:id", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.delete("/api/property-photos/:id", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
+    
     try {
       // Get the photo to delete the object from storage
       const photos = await storage.getPropertyPhotos("", req.tenantId);
@@ -1450,14 +1461,14 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Serve object files
-  app.get("/objects/*", isAuthenticated, async (req, res) => {
+  app.get("/objects/*", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
     try {
       const objectPath = req.path;
       const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
       
       // Check access permission
       const canAccess = await objectStorageService.canAccessObjectEntity({
-        userId: req.user?.id,
+        userId: req.dbUser?.id,
         objectFile,
       });
 
