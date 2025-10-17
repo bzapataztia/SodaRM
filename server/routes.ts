@@ -1359,6 +1359,121 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
+  // Object Storage endpoints
+  const { ObjectStorageService } = await import("./objectStorage");
+  const objectStorageService = new ObjectStorageService();
+
+  app.post("/api/object-storage/upload-url", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+    try {
+      const uploadUrl = await objectStorageService.getObjectEntityUploadURL();
+      res.json({ 
+        url: uploadUrl,
+        method: "PUT",
+        headers: {}
+      });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
+    }
+  });
+
+  app.post("/api/object-storage/normalize-path", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+    try {
+      const { rawPath } = req.body;
+      const normalizedPath = objectStorageService.normalizeObjectEntityPath(rawPath);
+      res.json({ normalizedPath });
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
+    }
+  });
+
+  // Property Photos endpoints
+  app.get("/api/properties/:id/photos", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+    try {
+      const photos = await storage.getPropertyPhotos(req.params.id, req.tenantId);
+      res.json(photos);
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
+    }
+  });
+
+  app.post("/api/properties/:id/photos", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+    try {
+      const { objectPath, caption } = req.body;
+      
+      // Check photo count limit (max 10 photos per property)
+      const photoCount = await storage.getPropertyPhotosCount(req.params.id, req.tenantId);
+      if (photoCount >= 10) {
+        return res.status(400).json({ message: 'Máximo 10 fotos por propiedad' });
+      }
+
+      // Set ACL policy for the uploaded object
+      const { ObjectAclPolicy, ObjectPermission } = await import("./objectAcl");
+      const aclPolicy: typeof ObjectAclPolicy.prototype = {
+        owner: req.user!.id,
+        visibility: 'public',
+      };
+      
+      const normalizedPath = await objectStorageService.trySetObjectEntityAclPolicy(objectPath, aclPolicy);
+
+      const photo = await storage.createPropertyPhoto({
+        tenantId: req.tenantId,
+        propertyId: req.params.id,
+        objectPath: normalizedPath,
+        caption: caption || null,
+      });
+
+      res.status(201).json(photo);
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
+    }
+  });
+
+  app.delete("/api/property-photos/:id", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+    try {
+      // Get the photo to delete the object from storage
+      const photos = await storage.getPropertyPhotos("", req.tenantId);
+      const photo = photos.find(p => p.id === req.params.id);
+      
+      if (photo) {
+        try {
+          await objectStorageService.deleteObject(photo.objectPath);
+        } catch (err) {
+          console.error("Error deleting object from storage:", err);
+        }
+      }
+
+      await storage.deletePropertyPhoto(req.params.id, req.tenantId);
+      res.status(204).send();
+    } catch (error: unknown) {
+      res.status(500).json({ message: getErrorMessage(error) });
+    }
+  });
+
+  // Serve object files
+  app.get("/objects/*", isAuthenticated, async (req, res) => {
+    try {
+      const objectPath = req.path;
+      const objectFile = await objectStorageService.getObjectEntityFile(objectPath);
+      
+      // Check access permission
+      const canAccess = await objectStorageService.canAccessObjectEntity({
+        userId: req.user?.id,
+        objectFile,
+      });
+
+      if (!canAccess) {
+        return res.status(403).json({ message: "Access denied" });
+      }
+
+      await objectStorageService.downloadObject(objectFile, res);
+    } catch (error: unknown) {
+      if (error instanceof (await import("./objectStorage")).ObjectNotFoundError) {
+        return res.status(404).json({ message: "Object not found" });
+      }
+      res.status(500).json({ message: getErrorMessage(error) });
+    }
+  });
+
   const httpServer = createServer(app);
 
   return httpServer;
