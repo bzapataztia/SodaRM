@@ -7,6 +7,10 @@ import type { Express, RequestHandler } from "express";
 import memoize from "memoizee";
 import connectPg from "connect-pg-simple";
 import { storage } from "./storage";
+import type {
+  ReplitAuthClaims,
+  ReplitAuthUser,
+} from "./types/auth";
 
 if (!process.env.REPLIT_DOMAINS) {
   throw new Error("Environment variable REPLIT_DOMAINS not provided");
@@ -45,25 +49,63 @@ export function getSession() {
   });
 }
 
-function updateUserSession(
-  user: any,
-  tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers
-) {
-  user.claims = tokens.claims();
-  user.access_token = tokens.access_token;
-  user.refresh_token = tokens.refresh_token;
-  user.expires_at = user.claims?.exp;
+function toReplitClaims(
+  tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers,
+): ReplitAuthClaims {
+  const rawClaims = tokens.claims();
+
+  if (!rawClaims || typeof rawClaims.sub !== "string") {
+    throw new Error("Missing subject claim in authentication response");
+  }
+
+  return {
+    sub: rawClaims.sub,
+    email: typeof rawClaims.email === "string" ? rawClaims.email : undefined,
+    first_name:
+      typeof rawClaims.first_name === "string" ? rawClaims.first_name : undefined,
+    last_name:
+      typeof rawClaims.last_name === "string" ? rawClaims.last_name : undefined,
+    profile_image_url:
+      typeof rawClaims.profile_image_url === "string"
+        ? rawClaims.profile_image_url
+        : undefined,
+    raw: rawClaims as Record<string, unknown>,
+  };
 }
 
-async function upsertUser(
-  claims: any,
+function buildAuthUser(
+  tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers,
+): ReplitAuthUser {
+  const claims = toReplitClaims(tokens);
+  const rawClaims = tokens.claims();
+  const exp = typeof rawClaims?.exp === "number" ? rawClaims.exp : undefined;
+
+  return {
+    claims,
+    access_token: tokens.access_token,
+    refresh_token: tokens.refresh_token,
+    expires_at: exp,
+  };
+}
+
+function updateUserSession(
+  user: ReplitAuthUser,
+  tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers,
 ) {
+  const updated = buildAuthUser(tokens);
+  user.claims = updated.claims;
+  user.access_token = updated.access_token;
+  user.refresh_token = updated.refresh_token;
+  user.expires_at = updated.expires_at;
+}
+
+async function upsertUser(claims: ReplitAuthClaims) {
   await storage.upsertUser({
-    id: claims["sub"],
-    email: claims["email"],
-    firstName: claims["first_name"],
-    lastName: claims["last_name"],
-    profileImageUrl: claims["profile_image_url"],
+    id: claims.sub,
+    email: claims.email,
+    firstName: claims.first_name,
+    lastName: claims.last_name,
+    profileImageUrl: claims.profile_image_url,
   });
 }
 
@@ -77,12 +119,15 @@ export async function setupAuth(app: Express) {
 
   const verify: VerifyFunction = async (
     tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers,
-    verified: passport.AuthenticateCallback
+    verified: passport.AuthenticateCallback,
   ) => {
-    const user = {};
-    updateUserSession(user, tokens);
-    await upsertUser(tokens.claims());
-    verified(null, user);
+    try {
+      const user = buildAuthUser(tokens);
+      await upsertUser(user.claims);
+      verified(null, user as Express.User);
+    } catch (error) {
+      verified(error as Error);
+    }
   };
 
   for (const domain of process.env
@@ -129,9 +174,9 @@ export async function setupAuth(app: Express) {
 }
 
 export const isAuthenticated: RequestHandler = async (req, res, next) => {
-  const user = req.user as any;
+  const user = req.user;
 
-  if (!req.isAuthenticated() || !user.expires_at) {
+  if (!req.isAuthenticated() || !user?.expires_at) {
     return res.status(401).json({ message: "Unauthorized" });
   }
 

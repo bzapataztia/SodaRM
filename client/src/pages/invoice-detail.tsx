@@ -7,19 +7,53 @@ import { api } from '@/lib/api';
 import { queryClient } from '@/lib/queryClient';
 import { useToast } from '@/hooks/use-toast';
 
+type InvoiceCharge = {
+  id: string;
+  description: string;
+  amount: string | number | null;
+};
+
+type InvoiceDetail = {
+  id: string;
+  number: string;
+  totalAmount: string | number | null;
+  amountPaid: string | number | null;
+  subtotal: string | number | null;
+  lateFee: string | number | null;
+  status?: string | null;
+  issueDate?: string | null;
+  dueDate?: string | null;
+  charges?: InvoiceCharge[] | null;
+  tenantContact?: { fullName?: string | null; email?: string | null } | null;
+  contract?: { property?: { name?: string | null; address?: string | null } | null } | null;
+};
+
+function toNumber(value: string | number | null | undefined): number {
+  if (value == null) {
+    return 0;
+  }
+  const numeric = typeof value === 'number' ? value : Number.parseFloat(value);
+  return Number.isFinite(numeric) ? numeric : 0;
+}
+
 export default function InvoiceDetailPage() {
   const [, params] = useRoute('/invoices/:id');
   const [, setLocation] = useLocation();
   const { toast } = useToast();
   const invoiceId = params?.id;
 
-  const { data: invoice, isLoading } = useQuery({
+  const { data: invoice, isLoading } = useQuery<InvoiceDetail | null>({
     queryKey: [`/api/invoices/${invoiceId}`],
     enabled: !!invoiceId,
   });
 
   const remindMutation = useMutation({
-    mutationFn: () => api.invoices.remind(invoiceId!),
+    mutationFn: () => {
+      if (!invoiceId) {
+        throw new Error('Invoice ID is required');
+      }
+      return api.invoices.remind(invoiceId);
+    },
     onSuccess: () => {
       toast({
         title: 'Recordatorio enviado',
@@ -62,7 +96,12 @@ export default function InvoiceDetailPage() {
     }).format(value);
   };
 
-  const balance = parseFloat(invoice.totalAmount) - parseFloat(invoice.amountPaid);
+  const totalAmount = toNumber(invoice.totalAmount);
+  const amountPaid = toNumber(invoice.amountPaid);
+  const balance = totalAmount - amountPaid;
+  const issueDate = invoice.issueDate ? new Date(invoice.issueDate).toLocaleDateString('es-ES') : '—';
+  const dueDate = invoice.dueDate ? new Date(invoice.dueDate).toLocaleDateString('es-ES') : '—';
+  const charges = invoice.charges ?? [];
 
   return (
     <div className="flex h-screen overflow-hidden">
@@ -110,21 +149,21 @@ export default function InvoiceDetailPage() {
                   <div className="grid grid-cols-2 gap-6">
                     <div>
                       <p className="text-sm text-muted-foreground mb-1">Inquilino</p>
-                      <p className="font-medium">{invoice.tenantContact?.fullName}</p>
-                      <p className="text-sm text-muted-foreground">{invoice.tenantContact?.email}</p>
+                      <p className="font-medium">{invoice.tenantContact?.fullName ?? '—'}</p>
+                      <p className="text-sm text-muted-foreground">{invoice.tenantContact?.email ?? '—'}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground mb-1">Propiedad</p>
-                      <p className="font-medium">{invoice.contract?.property?.name}</p>
-                      <p className="text-sm text-muted-foreground">{invoice.contract?.property?.address}</p>
+                      <p className="font-medium">{invoice.contract?.property?.name ?? '—'}</p>
+                      <p className="text-sm text-muted-foreground">{invoice.contract?.property?.address ?? '—'}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground mb-1">Fecha de emisión</p>
-                      <p className="font-semibold">{new Date(invoice.issueDate).toLocaleDateString('es-ES')}</p>
+                      <p className="font-semibold">{issueDate}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground mb-1">Fecha de vencimiento</p>
-                      <p className="font-semibold">{new Date(invoice.dueDate).toLocaleDateString('es-ES')}</p>
+                      <p className="font-semibold">{dueDate}</p>
                     </div>
                   </div>
                 </div>
@@ -132,12 +171,12 @@ export default function InvoiceDetailPage() {
                 <div className="bg-card rounded-lg border border-border p-6">
                   <h3 className="text-sm font-semibold mb-3">Conceptos facturados</h3>
                   <div className="space-y-3">
-                    {invoice.charges?.map((charge: any) => (
+                    {charges.map(charge => (
                       <div key={charge.id} className="flex items-center justify-between p-3 bg-muted/30 rounded-lg">
                         <div>
                           <p className="font-medium">{charge.description}</p>
                         </div>
-                        <p className="font-mono font-semibold">{formatCurrency(parseFloat(charge.amount))}</p>
+                        <p className="font-mono font-semibold">{formatCurrency(toNumber(charge.amount))}</p>
                       </div>
                     ))}
                   </div>
@@ -145,17 +184,17 @@ export default function InvoiceDetailPage() {
                   <div className="mt-6 pt-6 border-t border-border space-y-2">
                     <div className="flex items-center justify-between text-sm">
                       <p className="text-muted-foreground">Subtotal</p>
-                      <p className="font-mono">{formatCurrency(parseFloat(invoice.subtotal))}</p>
+                      <p className="font-mono">{formatCurrency(toNumber(invoice.subtotal))}</p>
                     </div>
-                    {parseFloat(invoice.lateFee) > 0 && (
+                    {toNumber(invoice.lateFee) > 0 && (
                       <div className="flex items-center justify-between text-sm">
                         <p className="text-destructive">Mora</p>
-                        <p className="font-mono text-destructive">{formatCurrency(parseFloat(invoice.lateFee))}</p>
+                        <p className="font-mono text-destructive">{formatCurrency(toNumber(invoice.lateFee))}</p>
                       </div>
                     )}
                     <div className="flex items-center justify-between text-lg font-bold pt-3 border-t border-border">
                       <p>Total</p>
-                      <p className="font-mono">{formatCurrency(parseFloat(invoice.totalAmount))}</p>
+                      <p className="font-mono">{formatCurrency(totalAmount)}</p>
                     </div>
                   </div>
                 </div>
@@ -167,12 +206,12 @@ export default function InvoiceDetailPage() {
                   <div className="space-y-4">
                     <div>
                       <p className="text-sm text-muted-foreground mb-1">Total facturado</p>
-                      <p className="text-2xl font-bold font-mono">{formatCurrency(parseFloat(invoice.totalAmount))}</p>
+                      <p className="text-2xl font-bold font-mono">{formatCurrency(totalAmount)}</p>
                     </div>
                     <div>
                       <p className="text-sm text-muted-foreground mb-1">Total pagado</p>
                       <p className="text-2xl font-bold font-mono text-success">
-                        {formatCurrency(parseFloat(invoice.amountPaid))}
+                        {formatCurrency(amountPaid)}
                       </p>
                     </div>
                     <div className="pt-4 border-t border-border">
