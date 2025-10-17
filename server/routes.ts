@@ -110,7 +110,7 @@ export async function registerRoutes(app: Express): Promise<Server> {
   await setupAuth(app);
 
   // Auth Routes
-  app.get('/api/auth/user', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+  app.get('/api/auth/user', isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
     if (!ensureTenantRequest(req, res)) {
       return;
     }
