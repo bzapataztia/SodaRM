@@ -1,6 +1,6 @@
 import { useState, useRef } from "react";
 import { Button } from "@/components/ui/button";
-import { Upload } from "lucide-react";
+import { Upload, Image } from "lucide-react";
 
 interface ObjectUploaderProps {
   onUploadComplete: (objectPath: string) => void;
@@ -110,8 +110,8 @@ export function ObjectUploader({
   };
 
   return (
-    <div className="space-y-4">
-      <div className="border-2 border-dashed rounded-lg p-6 text-center">
+    <div className="space-y-3">
+      <div className="relative group">
         <input
           ref={fileInputRef}
           type="file"
@@ -122,31 +122,56 @@ export function ObjectUploader({
         />
         <label
           htmlFor="photo-upload"
-          className="cursor-pointer flex flex-col items-center gap-2"
+          className="cursor-pointer block"
         >
-          <Upload className="w-12 h-12 text-muted-foreground" />
-          <div className="text-sm text-muted-foreground">
-            <span className="text-primary font-medium">Haz clic para seleccionar</span> o arrastra una imagen
+          <div className="border-2 border-dashed border-primary/30 hover:border-primary/60 rounded-xl p-8 text-center transition-all bg-background/50 hover:bg-primary/5">
+            <div className="flex flex-col items-center gap-3">
+              <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
+                <Upload className="w-8 h-8 text-primary" />
+              </div>
+              <div>
+                <p className="text-sm font-medium">
+                  <span className="text-primary">Haz clic para seleccionar</span>
+                  <span className="text-muted-foreground"> o arrastra una imagen</span>
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">{note}</p>
+              </div>
+            </div>
           </div>
-          <div className="text-xs text-muted-foreground">{note}</div>
         </label>
       </div>
 
       {selectedFile && (
-        <div className="flex items-center justify-between bg-muted p-3 rounded-lg">
-          <div className="text-sm truncate flex-1">
-            <div className="font-medium">{selectedFile.name}</div>
-            <div className="text-muted-foreground">
-              {(selectedFile.size / 1024).toFixed(1)} KB
+        <div className="bg-gradient-to-r from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/20 border border-primary/20 rounded-xl p-4">
+          <div className="flex items-center gap-4">
+            <div className="w-12 h-12 rounded-lg bg-primary/20 flex items-center justify-center flex-shrink-0">
+              <Image className="w-6 h-6 text-primary" />
             </div>
+            <div className="flex-1 min-w-0">
+              <p className="font-medium text-sm truncate">{selectedFile.name}</p>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                {(selectedFile.size / 1024).toFixed(1)} KB
+              </p>
+            </div>
+            <Button
+              onClick={handleUpload}
+              disabled={isUploading}
+              size="sm"
+              className="flex-shrink-0"
+            >
+              {isUploading ? (
+                <>
+                  <div className="animate-spin w-4 h-4 border-2 border-primary-foreground border-t-transparent rounded-full mr-2" />
+                  Subiendo...
+                </>
+              ) : (
+                <>
+                  <Upload className="w-4 h-4 mr-2" />
+                  Subir
+                </>
+              )}
+            </Button>
           </div>
-          <Button
-            onClick={handleUpload}
-            disabled={isUploading}
-            size="sm"
-          >
-            {isUploading ? "Subiendo..." : "Subir"}
-          </Button>
         </div>
       )}
     </div>

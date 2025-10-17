@@ -360,15 +360,23 @@ function PhotoGalleryDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-4xl max-h-[80vh] overflow-y-auto">
-        <DialogHeader>
-          <DialogTitle>Fotos de {property?.name}</DialogTitle>
+      <DialogContent className="max-w-5xl max-h-[90vh] overflow-hidden flex flex-col">
+        <DialogHeader className="pb-4">
+          <DialogTitle className="text-2xl font-bold">Fotos de {property?.name}</DialogTitle>
+          <p className="text-sm text-muted-foreground mt-1">
+            {photos.length} de 10 fotos • Máximo 2MB por imagen
+          </p>
         </DialogHeader>
         
-        <div className="space-y-6">
+        <div className="flex-1 overflow-y-auto space-y-6 pr-2">
           {photos.length < 10 && (
-            <div>
-              <h3 className="text-sm font-medium mb-3">Subir Nueva Foto</h3>
+            <div className="bg-gradient-to-br from-primary/5 to-primary/10 dark:from-primary/10 dark:to-primary/20 rounded-xl p-6 border border-primary/20">
+              <div className="flex items-center gap-2 mb-4">
+                <div className="w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center">
+                  <Upload className="w-4 h-4 text-primary" />
+                </div>
+                <h3 className="font-semibold text-lg">Subir Nueva Foto</h3>
+              </div>
               <ObjectUploader 
                 onUploadComplete={handleUploadComplete}
                 onUploadError={(error) => {
@@ -376,50 +384,88 @@ function PhotoGalleryDialog({
                 }}
               />
               {isUploading && (
-                <div className="mt-2 text-sm text-muted-foreground">Guardando...</div>
+                <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
+                  <div className="animate-spin w-4 h-4 border-2 border-primary border-t-transparent rounded-full" />
+                  <span>Guardando foto...</span>
+                </div>
               )}
             </div>
           )}
 
           {photos.length >= 10 && (
-            <div className="bg-amber-50 dark:bg-amber-950 border border-amber-200 dark:border-amber-800 rounded-md p-3">
-              <p className="text-sm text-amber-800 dark:text-amber-200">
-                Se ha alcanzado el límite máximo de 10 fotos por propiedad
-              </p>
+            <div className="bg-gradient-to-r from-amber-50 to-orange-50 dark:from-amber-950/50 dark:to-orange-950/50 border border-amber-200 dark:border-amber-800 rounded-xl p-4">
+              <div className="flex items-start gap-3">
+                <div className="w-10 h-10 rounded-full bg-amber-100 dark:bg-amber-900 flex items-center justify-center flex-shrink-0">
+                  <Image className="w-5 h-5 text-amber-600 dark:text-amber-400" />
+                </div>
+                <div>
+                  <p className="font-medium text-amber-900 dark:text-amber-100">Límite alcanzado</p>
+                  <p className="text-sm text-amber-700 dark:text-amber-300 mt-1">
+                    Has alcanzado el máximo de 10 fotos por propiedad. Elimina alguna para subir una nueva.
+                  </p>
+                </div>
+              </div>
             </div>
           )}
 
           <div>
-            <h3 className="text-sm font-medium mb-3">Galería ({photos.length}/10)</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="font-semibold text-lg">Galería</h3>
+              <span className="text-sm text-muted-foreground">
+                {photos.length} {photos.length === 1 ? 'foto' : 'fotos'}
+              </span>
+            </div>
+            
             {isLoading ? (
-              <div className="flex justify-center py-8">
-                <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full" />
+              <div className="flex justify-center py-12">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="animate-spin w-10 h-10 border-4 border-primary border-t-transparent rounded-full" />
+                  <p className="text-sm text-muted-foreground">Cargando fotos...</p>
+                </div>
               </div>
             ) : photos.length === 0 ? (
-              <div className="text-center py-8 text-muted-foreground">
-                <Image className="w-12 h-12 mx-auto mb-2 opacity-50" />
-                <p>No hay fotos</p>
+              <div className="text-center py-16 bg-muted/30 rounded-xl border-2 border-dashed">
+                <div className="flex flex-col items-center gap-3">
+                  <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center">
+                    <Image className="w-8 h-8 text-primary/60" />
+                  </div>
+                  <div>
+                    <p className="font-medium text-muted-foreground">No hay fotos</p>
+                    <p className="text-sm text-muted-foreground/70 mt-1">Sube la primera foto de esta propiedad</p>
+                  </div>
+                </div>
               </div>
             ) : (
               <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-                {photos.map((photo) => (
+                {photos.map((photo, index) => (
                   <div key={photo.id} className="relative group">
-                    <img 
-                      src={photo.objectPath} 
-                      alt={photo.caption || 'Foto de propiedad'} 
-                      className="w-full h-48 object-cover rounded-lg"
-                    />
-                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all rounded-lg flex items-center justify-center">
-                      <Button
-                        variant="destructive"
-                        size="sm"
-                        className="opacity-0 group-hover:opacity-100 transition-opacity"
-                        onClick={() => deleteMutation.mutate(photo.id)}
-                        disabled={deleteMutation.isPending}
-                      >
-                        <Trash2 className="w-4 h-4 mr-1" />
-                        Eliminar
-                      </Button>
+                    <div className="relative overflow-hidden rounded-xl border-2 border-border hover:border-primary/50 transition-all">
+                      <img 
+                        src={photo.objectPath} 
+                        alt={photo.caption || `Foto ${index + 1}`} 
+                        className="w-full h-48 object-cover group-hover:scale-105 transition-transform duration-300"
+                      />
+                      {index === 0 && (
+                        <div className="absolute top-2 left-2">
+                          <span className="inline-flex items-center px-2 py-1 rounded-full text-xs font-medium bg-primary text-primary-foreground shadow-lg">
+                            Principal
+                          </span>
+                        </div>
+                      )}
+                      <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-black/0 to-black/0 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <div className="absolute bottom-3 left-3 right-3 flex items-center justify-between">
+                          <span className="text-white text-sm font-medium">Foto {index + 1}</span>
+                          <Button
+                            variant="destructive"
+                            size="sm"
+                            className="shadow-lg"
+                            onClick={() => deleteMutation.mutate(photo.id)}
+                            disabled={deleteMutation.isPending}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
                     </div>
                   </div>
                 ))}
