@@ -2,8 +2,28 @@ import { useQuery } from '@tanstack/react-query';
 import Sidebar from '@/components/layout/sidebar';
 import Topbar from '@/components/layout/topbar';
 
+type OcrLog = {
+  id: string;
+  status: 'ok' | 'needs_review' | 'error' | string;
+  confidence?: string | number | null;
+  extractedAmount?: string | number | null;
+};
+
+function formatPercentage(value: string | number | null | undefined): string {
+  const numeric = typeof value === 'number' ? value : Number.parseFloat(value ?? '0');
+  return Number.isFinite(numeric) ? numeric.toFixed(0) : '0';
+}
+
+function formatAmount(value: string | number | null | undefined): string {
+  const numeric = typeof value === 'number' ? value : Number.parseFloat(value ?? '0');
+  if (!Number.isFinite(numeric)) {
+    return '$0';
+  }
+  return `$${numeric.toLocaleString('es-CO')}`;
+}
+
 export default function OCRInboxPage() {
-  const { data: ocrLogs = [], isLoading } = useQuery({
+  const { data: ocrLogs = [], isLoading } = useQuery<OcrLog[]>({
     queryKey: ['/api/ocr/logs'],
   });
 
@@ -34,7 +54,7 @@ export default function OCRInboxPage() {
                   <p className="text-muted-foreground">No hay documentos en proceso</p>
                 </div>
               ) : (
-                ocrLogs.map((log: any) => (
+                ocrLogs.map(log => (
                   <div key={log.id} className="border border-border rounded-lg p-4 hover:border-primary transition-colors">
                     <div className="flex items-start justify-between mb-3">
                       <div className="w-12 h-12 bg-destructive/10 rounded-lg flex items-center justify-center">
@@ -56,14 +76,12 @@ export default function OCRInboxPage() {
                     <div className="space-y-1 mb-3">
                       <div className="flex justify-between text-xs">
                         <span className="text-muted-foreground">Confianza</span>
-                        <span className="font-medium">{parseFloat(log.confidence || 0).toFixed(0)}%</span>
+                        <span className="font-medium">{formatPercentage(log.confidence)}%</span>
                       </div>
                       {log.extractedAmount && (
                         <div className="flex justify-between text-xs">
                           <span className="text-muted-foreground">Monto</span>
-                          <span className="font-medium font-mono">
-                            ${parseFloat(log.extractedAmount).toLocaleString('es-CO')}
-                          </span>
+                          <span className="font-medium font-mono">{formatAmount(log.extractedAmount)}</span>
                         </div>
                       )}
                     </div>

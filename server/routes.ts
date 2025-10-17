@@ -1,5 +1,6 @@
-import type { Express, NextFunction, Response } from "express";
+import type { Express, Response } from "express";
 import type { ParamsDictionary } from "express-serve-static-core";
+import type { ParsedQs } from "qs";
 import { createServer, type Server } from "http";
 import { storage } from "./storage";
 import { db } from "./db";
@@ -33,7 +34,7 @@ const upload = multer({
   limits: { fileSize: 10 * 1024 * 1024 } // 10MB max
 });
 
-type CsvImportRequest = TenantBoundRequest<ParamsDictionary, unknown, { csvContent?: string }>;
+type CsvImportRequest = AuthenticatedRequest<ParamsDictionary, unknown, { csvContent?: string }>;
 type OnboardRequest = AuthenticatedRequest<ParamsDictionary, unknown, { companyName?: string }>;
 type PartialInsertContact = Partial<z.infer<typeof insertContactSchema>>;
 type PartialInsertProperty = Partial<z.infer<typeof insertPropertySchema>>;
@@ -55,13 +56,14 @@ const updateInsurerSchema = insertInsurerSchema.omit({ tenantId: true }).partial
 const updatePolicySchema = insertPolicySchema.omit({ tenantId: true }).partial();
 
 // Helper middleware to load user and tenant info
-async function withUser(
-  req: AuthenticatedRequest,
-  res: Response,
-  next: NextFunction,
-): Promise<void> {
+const withUser: import("express").RequestHandler = async (
+  req,
+  res,
+  next,
+) => {
+  const authReq = req as AuthenticatedRequest;
   try {
-    const userId = req.user?.claims.sub;
+    const userId = authReq.user?.claims.sub;
     if (!userId) {
       res.status(401).json({ message: "Unauthorized" });
       return;
@@ -77,13 +79,30 @@ async function withUser(
       return res.status(403).json({ message: "User needs to complete onboarding" });
     }
 
-    req.dbUser = user;
-    req.tenantId = user.tenantId;
+    authReq.dbUser = { ...user, tenantId: user.tenantId } as typeof user & { tenantId: string };
+    authReq.tenantId = user.tenantId;
     next();
   } catch (error) {
     console.error("Error loading user:", error);
     res.status(500).json({ message: "Failed to load user" });
   }
+};
+
+function ensureTenantRequest<
+  P = ParamsDictionary,
+  ResBody = unknown,
+  ReqBody = Record<string, unknown>,
+  ReqQuery = ParsedQs,
+>(
+  req: AuthenticatedRequest<P, ResBody, ReqBody, ReqQuery>,
+  res: Response,
+): req is TenantBoundRequest<P, ResBody, ReqBody, ReqQuery> {
+  const { tenantId, dbUser } = req;
+  if (typeof tenantId !== "string" || !dbUser || typeof dbUser.tenantId !== "string") {
+    res.status(500).json({ message: "Tenant context not available" });
+    return false;
+  }
+  return true;
 }
 
 export async function registerRoutes(app: Express): Promise<Server> {
@@ -92,6 +111,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // Auth Routes
   app.get('/api/auth/user', isAuthenticated, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const userId = req.user?.claims.sub;
       if (!userId) {
@@ -182,7 +204,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Tenants
-  app.get("/api/tenants/current", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.get("/api/tenants/current", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const tenant = await storage.getTenant(req.tenantId);
       if (!tenant) {
@@ -194,7 +219,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/tenants/current", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.patch("/api/tenants/current", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       // Only allow updating the logo field for security
       const validatedData = updateTenantLogoSchema.parse(req.body);
@@ -210,6 +238,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
 
   // CSV Import & Templates
   app.post("/api/import/contacts", isAuthenticated, withUser, async (req: CsvImportRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const { csvContent } = req.body;
       if (typeof csvContent !== "string" || csvContent.trim().length === 0) {
@@ -223,6 +254,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/import/properties", isAuthenticated, withUser, async (req: CsvImportRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const { csvContent } = req.body;
       if (typeof csvContent !== "string" || csvContent.trim().length === 0) {
@@ -236,6 +270,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/import/payments", isAuthenticated, withUser, async (req: CsvImportRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const { csvContent } = req.body;
       if (typeof csvContent !== "string" || csvContent.trim().length === 0) {
@@ -249,6 +286,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/import/contracts", isAuthenticated, withUser, async (req: CsvImportRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const { csvContent } = req.body;
       if (typeof csvContent !== "string" || csvContent.trim().length === 0) {
@@ -262,6 +302,9 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   app.post("/api/import/invoices", isAuthenticated, withUser, async (req: CsvImportRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const { csvContent } = req.body;
       if (typeof csvContent !== "string" || csvContent.trim().length === 0) {
@@ -305,7 +348,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Contacts
-  app.get("/api/contacts", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.get("/api/contacts", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const contacts = await storage.getContacts(req.tenantId);
       res.json(contacts);
@@ -314,7 +360,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/contacts", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.post("/api/contacts", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const contactData = insertContactSchema.parse({
         ...req.body,
@@ -327,7 +376,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/contacts/:id", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.get("/api/contacts/:id", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const contact = await storage.getContact(req.params.id, req.tenantId);
       if (!contact) {
@@ -339,7 +391,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/contacts/:id", isAuthenticated, withUser, async (req: TenantBoundRequest<ParamsDictionary, unknown, PartialInsertContact>, res) => {
+  app.patch("/api/contacts/:id", isAuthenticated, withUser, async (req: AuthenticatedRequest<ParamsDictionary, unknown, PartialInsertContact>, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const updateData = updateContactSchema.parse(req.body);
       const contact = await storage.updateContact(req.params.id, req.tenantId, updateData);
@@ -352,7 +407,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/contacts/:id", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.delete("/api/contacts/:id", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       await storage.deleteContact(req.params.id, req.tenantId);
       res.json({ message: "Contact deleted successfully" });
@@ -362,7 +420,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Properties
-  app.get("/api/properties", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.get("/api/properties", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const properties = await storage.getProperties(req.tenantId);
       res.json(properties);
@@ -371,7 +432,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/properties", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.post("/api/properties", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const tenant = await storage.getTenant(req.tenantId);
       const currentCount = await storage.getPropertiesCount(req.tenantId);
@@ -391,7 +455,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/properties/:id", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.get("/api/properties/:id", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const property = await storage.getProperty(req.params.id, req.tenantId);
       if (!property) {
@@ -403,7 +470,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/properties/:id", isAuthenticated, withUser, async (req: TenantBoundRequest<ParamsDictionary, unknown, PartialInsertProperty>, res) => {
+  app.patch("/api/properties/:id", isAuthenticated, withUser, async (req: AuthenticatedRequest<ParamsDictionary, unknown, PartialInsertProperty>, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const updateData = updatePropertySchema.parse(req.body);
       const property = await storage.updateProperty(req.params.id, req.tenantId, updateData);
@@ -416,7 +486,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/properties/:id", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.delete("/api/properties/:id", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       await storage.deleteProperty(req.params.id, req.tenantId);
       res.json({ message: "Property deleted successfully" });
@@ -426,7 +499,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Contracts
-  app.get("/api/contracts", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.get("/api/contracts", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const contracts = await storage.getContracts(req.tenantId);
       res.json(contracts);
@@ -435,7 +511,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/contracts", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.post("/api/contracts", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const contractData = insertContractSchema.parse({
         ...req.body,
@@ -469,7 +548,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/contracts/:id", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.get("/api/contracts/:id", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const contract = await storage.getContract(req.params.id, req.tenantId);
       if (!contract) {
@@ -481,7 +563,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/contracts/:id", isAuthenticated, withUser, async (req: TenantBoundRequest<ParamsDictionary, unknown, PartialInsertContract>, res) => {
+  app.patch("/api/contracts/:id", isAuthenticated, withUser, async (req: AuthenticatedRequest<ParamsDictionary, unknown, PartialInsertContract>, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const updateData = updateContractSchema.parse(req.body);
       // Get existing contract first
@@ -527,7 +612,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/contracts/:id", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.delete("/api/contracts/:id", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       await storage.deleteContract(req.params.id, req.tenantId);
       res.json({ message: "Contract deleted successfully" });
@@ -536,7 +624,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/contracts/:id/activate", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.post("/api/contracts/:id/activate", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const { id } = req.params;
       const contract = await storage.getContract(id, req.tenantId);
@@ -555,7 +646,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Invoices
-  app.get("/api/invoices", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.get("/api/invoices", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const invoices = await storage.getInvoices(req.tenantId);
       res.json(invoices);
@@ -564,7 +658,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/invoices/:id", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.get("/api/invoices/:id", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const invoice = await storage.getInvoice(req.params.id, req.tenantId);
       
@@ -578,7 +675,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/invoices/:id/remind", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.post("/api/invoices/:id/remind", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const invoice = await storage.getInvoice(req.params.id, req.tenantId);
       
@@ -609,7 +709,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/invoices/:id/recalc", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.post("/api/invoices/:id/recalc", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const invoice = await storage.getInvoice(req.params.id, req.tenantId);
       
@@ -624,7 +727,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/invoices/:id/pdf", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.get("/api/invoices/:id/pdf", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       // Get invoice with all required relations for PDF generation
       const invoice = await db.query.invoices.findFirst({
@@ -655,7 +761,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/invoices", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.post("/api/invoices", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const invoiceData = insertInvoiceSchema.parse({
         ...req.body,
@@ -679,7 +788,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/invoices/:id", isAuthenticated, withUser, async (req: TenantBoundRequest<ParamsDictionary, unknown, PartialInsertInvoice>, res) => {
+  app.patch("/api/invoices/:id", isAuthenticated, withUser, async (req: AuthenticatedRequest<ParamsDictionary, unknown, PartialInsertInvoice>, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const updateData = updateInvoiceSchema.parse(req.body);
       // Validate amounts if present
@@ -716,7 +828,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/invoices/:id", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.delete("/api/invoices/:id", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       await storage.deleteInvoice(req.params.id, req.tenantId);
       res.json({ message: "Invoice deleted successfully" });
@@ -726,7 +841,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Payments
-  app.get("/api/payments", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.get("/api/payments", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const payments = await storage.getPayments(req.tenantId);
       res.json(payments);
@@ -735,7 +853,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/payments", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.post("/api/payments", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const paymentData = insertPaymentSchema.parse({
         ...req.body,
@@ -766,7 +887,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/payments/:id", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.get("/api/payments/:id", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const payment = await storage.getPayment(req.params.id, req.tenantId);
       if (!payment) {
@@ -778,7 +902,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/payments/:id", isAuthenticated, withUser, async (req: TenantBoundRequest<ParamsDictionary, unknown, PartialInsertPayment>, res) => {
+  app.patch("/api/payments/:id", isAuthenticated, withUser, async (req: AuthenticatedRequest<ParamsDictionary, unknown, PartialInsertPayment>, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const existingPayment = await storage.getPayment(req.params.id, req.tenantId);
       if (!existingPayment) {
@@ -816,7 +943,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/payments/:id", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.delete("/api/payments/:id", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       await storage.deletePayment(req.params.id, req.tenantId);
       res.json({ message: "Payment deleted successfully" });
@@ -826,7 +956,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Insurers
-  app.get("/api/insurers", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.get("/api/insurers", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const insurers = await storage.getInsurers(req.tenantId);
       res.json(insurers);
@@ -835,7 +968,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/insurers", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.post("/api/insurers", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const insurerData = insertInsurerSchema.parse({
         ...req.body,
@@ -848,7 +984,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/insurers/:id", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.get("/api/insurers/:id", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const insurer = await storage.getInsurer(req.params.id, req.tenantId);
       if (!insurer) {
@@ -860,7 +999,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/insurers/:id", isAuthenticated, withUser, async (req: TenantBoundRequest<ParamsDictionary, unknown, PartialInsertInsurer>, res) => {
+  app.patch("/api/insurers/:id", isAuthenticated, withUser, async (req: AuthenticatedRequest<ParamsDictionary, unknown, PartialInsertInsurer>, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const updateData = updateInsurerSchema.parse(req.body);
       const insurer = await storage.updateInsurer(req.params.id, req.tenantId, updateData);
@@ -873,7 +1015,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/insurers/:id", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.delete("/api/insurers/:id", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       await storage.deleteInsurer(req.params.id, req.tenantId);
       res.json({ message: "Insurer deleted successfully" });
@@ -883,7 +1028,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Policies
-  app.get("/api/policies", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.get("/api/policies", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const policies = await storage.getPolicies(req.tenantId);
       res.json(policies);
@@ -892,7 +1040,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/policies", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.post("/api/policies", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const policyData = insertPolicySchema.parse({
         ...req.body,
@@ -905,7 +1056,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/policies/:id", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.get("/api/policies/:id", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const policy = await storage.getPolicy(req.params.id, req.tenantId);
       if (!policy) {
@@ -917,7 +1071,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.patch("/api/policies/:id", isAuthenticated, withUser, async (req: TenantBoundRequest<ParamsDictionary, unknown, PartialInsertPolicy>, res) => {
+  app.patch("/api/policies/:id", isAuthenticated, withUser, async (req: AuthenticatedRequest<ParamsDictionary, unknown, PartialInsertPolicy>, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const updateData = updatePolicySchema.parse(req.body);
       const policy = await storage.updatePolicy(req.params.id, req.tenantId, updateData);
@@ -930,7 +1087,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.delete("/api/policies/:id", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.delete("/api/policies/:id", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       await storage.deletePolicy(req.params.id, req.tenantId);
       res.json({ message: "Policy deleted successfully" });
@@ -940,7 +1100,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Policies with overdue invoices report
-  app.get("/api/insurers/:insurerId/overdue-policies-report", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.get("/api/insurers/:insurerId/overdue-policies-report", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const { insurerId } = req.params;
       const report = await storage.getPoliciesWithOverdueInvoices(insurerId, req.tenantId);
@@ -951,7 +1114,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // OCR
-  app.post("/api/ocr/process-invoice", isAuthenticated, withUser, upload.single('file'), async (req: TenantBoundRequest, res) => {
+  app.post("/api/ocr/process-invoice", isAuthenticated, withUser, upload.single('file'), async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       if (!req.file) {
         return res.status(400).json({ message: "No file uploaded" });
@@ -968,7 +1134,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.get("/api/ocr/logs", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.get("/api/ocr/logs", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const { status } = req.query;
       const logs = await storage.getOCRLogs(req.tenantId, status as string);
@@ -978,7 +1147,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/ocr/:id/approve", isAuthenticated, withUser, async (req: TenantBoundRequest<ParamsDictionary, unknown, OcrApproveBody>, res) => {
+  app.post("/api/ocr/:id/approve", isAuthenticated, withUser, async (req: AuthenticatedRequest<ParamsDictionary, unknown, OcrApproveBody>, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const { invoiceId, description, amount } = req.body;
       if (typeof invoiceId !== "string" || invoiceId.trim().length === 0) {
@@ -995,7 +1167,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/ocr/:id/create-invoice", isAuthenticated, withUser, async (req: TenantBoundRequest<ParamsDictionary, unknown, OcrCreateInvoiceBody>, res) => {
+  app.post("/api/ocr/:id/create-invoice", isAuthenticated, withUser, async (req: AuthenticatedRequest<ParamsDictionary, unknown, OcrCreateInvoiceBody>, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const { contractId } = req.body;
       if (typeof contractId !== "string" || contractId.trim().length === 0) {
@@ -1070,19 +1245,27 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Stripe Billing
-  app.post("/api/billing/create-checkout-session", isAuthenticated, withUser, async (req: TenantBoundRequest<ParamsDictionary, unknown, BillingCheckoutBody>, res) => {
+  app.post("/api/billing/create-checkout-session", isAuthenticated, withUser, async (req: AuthenticatedRequest<ParamsDictionary, unknown, BillingCheckoutBody>, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const { plan } = req.body;
       if (typeof plan !== "string" || plan.trim().length === 0) {
         return res.status(400).json({ message: "Plan is required" });
       }
+      const normalizedPlan = plan.trim().toLowerCase();
+      if (!['starter', 'growth', 'pro'].includes(normalizedPlan)) {
+        return res.status(400).json({ message: "Invalid plan selected" });
+      }
+      const selectedPlan = normalizedPlan as 'starter' | 'growth' | 'pro';
       const user = req.dbUser;
 
       if (!user.email) {
         return res.status(400).json({ message: "User email required" });
       }
 
-      const session = await createCheckoutSession(req.tenantId, plan, user.email);
+      const session = await createCheckoutSession(req.tenantId, selectedPlan, user.email);
       res.json({ url: session.url });
     } catch (error: unknown) {
       res.status(500).json({ message: getErrorMessage(error) });
@@ -1116,7 +1299,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
     }
   });
 
-  app.post("/api/billing/customer-portal", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.post("/api/billing/customer-portal", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const tenant = await storage.getTenant(req.tenantId);
       
@@ -1132,7 +1318,10 @@ export async function registerRoutes(app: Express): Promise<Server> {
   });
 
   // Dashboard Stats
-  app.get("/api/dashboard/stats", isAuthenticated, withUser, async (req: TenantBoundRequest, res) => {
+  app.get("/api/dashboard/stats", isAuthenticated, withUser, async (req: AuthenticatedRequest, res) => {
+    if (!ensureTenantRequest(req, res)) {
+      return;
+    }
     try {
       const invoices = await storage.getInvoices(req.tenantId);
       

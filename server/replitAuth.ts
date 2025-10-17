@@ -54,7 +54,7 @@ function toReplitClaims(
 ): ReplitAuthClaims {
   const rawClaims = tokens.claims();
 
-  if (typeof rawClaims.sub !== "string") {
+  if (!rawClaims || typeof rawClaims.sub !== "string") {
     throw new Error("Missing subject claim in authentication response");
   }
 
@@ -77,13 +77,14 @@ function buildAuthUser(
   tokens: client.TokenEndpointResponse & client.TokenEndpointResponseHelpers,
 ): ReplitAuthUser {
   const claims = toReplitClaims(tokens);
-  const exp = tokens.claims().exp;
+  const rawClaims = tokens.claims();
+  const exp = typeof rawClaims?.exp === "number" ? rawClaims.exp : undefined;
 
   return {
     claims,
     access_token: tokens.access_token,
     refresh_token: tokens.refresh_token,
-    expires_at: typeof exp === "number" ? exp : undefined,
+    expires_at: exp,
   };
 }
 
