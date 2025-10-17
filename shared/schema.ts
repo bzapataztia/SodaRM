@@ -201,6 +201,17 @@ export const auditLogs = pgTable("audit_logs", {
   createdAt: timestamp("created_at").notNull().defaultNow(),
 });
 
+// Property Photos
+export const propertyPhotos = pgTable("property_photos", {
+  id: varchar("id").primaryKey().default(sql`gen_random_uuid()`),
+  tenantId: varchar("tenant_id").notNull().references(() => tenants.id, { onDelete: "cascade" }),
+  propertyId: varchar("property_id").notNull().references(() => properties.id, { onDelete: "cascade" }),
+  photoUrl: text("photo_url").notNull(),
+  caption: text("caption"),
+  displayOrder: integer("display_order").notNull().default(0),
+  createdAt: timestamp("created_at").notNull().defaultNow(),
+});
+
 // Relations
 export const tenantsRelations = relations(tenants, ({ many }) => ({
   users: many(users),
@@ -213,6 +224,7 @@ export const tenantsRelations = relations(tenants, ({ many }) => ({
   policies: many(policies),
   ocrLogs: many(ocrLogs),
   auditLogs: many(auditLogs),
+  propertyPhotos: many(propertyPhotos),
 }));
 
 export const usersRelations = relations(users, ({ one }) => ({
@@ -243,6 +255,7 @@ export const propertiesRelations = relations(properties, ({ one, many }) => ({
     relationName: "propertyOwner",
   }),
   contracts: many(contracts),
+  photos: many(propertyPhotos),
 }));
 
 export const contractsRelations = relations(contracts, ({ one, many }) => ({
@@ -325,6 +338,17 @@ export const policiesRelations = relations(policies, ({ one }) => ({
   }),
 }));
 
+export const propertyPhotosRelations = relations(propertyPhotos, ({ one }) => ({
+  tenant: one(tenants, {
+    fields: [propertyPhotos.tenantId],
+    references: [tenants.id],
+  }),
+  property: one(properties, {
+    fields: [propertyPhotos.propertyId],
+    references: [properties.id],
+  }),
+}));
+
 // Insert Schemas
 export const insertTenantSchema = createInsertSchema(tenants).omit({ id: true, createdAt: true });
 export const updateTenantLogoSchema = z.object({
@@ -341,6 +365,7 @@ export const insertInsurerSchema = createInsertSchema(insurers).omit({ id: true,
 export const insertPolicySchema = createInsertSchema(policies).omit({ id: true, createdAt: true });
 export const insertOcrLogSchema = createInsertSchema(ocrLogs).omit({ id: true, createdAt: true });
 export const insertAuditLogSchema = createInsertSchema(auditLogs).omit({ id: true, createdAt: true });
+export const insertPropertyPhotoSchema = createInsertSchema(propertyPhotos).omit({ id: true, createdAt: true });
 
 // Select Types
 export type Tenant = typeof tenants.$inferSelect;
@@ -368,3 +393,5 @@ export type OcrLog = typeof ocrLogs.$inferSelect;
 export type InsertOcrLog = z.infer<typeof insertOcrLogSchema>;
 export type AuditLog = typeof auditLogs.$inferSelect;
 export type InsertAuditLog = z.infer<typeof insertAuditLogSchema>;
+export type PropertyPhoto = typeof propertyPhotos.$inferSelect;
+export type InsertPropertyPhoto = z.infer<typeof insertPropertyPhotoSchema>;
